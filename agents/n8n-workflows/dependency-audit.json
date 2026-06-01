@@ -1,0 +1,164 @@
+{
+  "name": "dependency-audit",
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "n2",
+      "name": "Trigger audit via SSH webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        300
+      ],
+      "parameters": {
+        "url": "http://10.0.4.10:8080/audit/run",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer "
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "checks",
+              "value": "[\"uv-pip-audit\",\"npm-audit\"]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "n3",
+      "name": "Parse audit results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        300
+      ],
+      "parameters": {
+        "jsCode": "\nconst results = $input.first().json;\nconst critical = (results.vulnerabilities || []).filter(v => ['HIGH','CRITICAL'].includes(v.severity));\nif (critical.length === 0) return [{ json: { has_issues: false } }];\nreturn critical.map(v => ({ json: { has_issues: true, package: v.package, severity: v.severity, description: v.description, fix: v.fix_version } }));\n",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "n4",
+      "name": "File GitHub Issue for each vulnerability",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1020,
+        300
+      ],
+      "parameters": {
+        "url": "https://api.github.com/repos/TheSocialChicken/BeerGame-TheNextLevel/issues",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer "
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "title",
+              "value": "=[SECURITY] {{ $json.severity }}: {{ $json.package }}"
+            },
+            {
+              "name": "body",
+              "value": "=**Package:** {{ $json.package }}\\n**Severity:** {{ $json.severity }}\\n**Fix:** {{ $json.fix }}\\n\\n{{ $json.description }}\\n\\n_Auto-filed by dependency-audit workflow_"
+            },
+            {
+              "name": "labels",
+              "value": "[\"security\",\"dependencies\"]"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "n1": {
+      "main": [
+        [
+          {
+            "node": "n2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "n2": {
+      "main": [
+        [
+          {
+            "node": "n3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "n3": {
+      "main": [
+        [
+          {
+            "node": "n4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "active": false,
+  "versionId": "17fec7b6-02f1-42d1-b93d-f1d68e6ad6db",
+  "id": "nfCwpcCfxUMpsc2u",
+  "description": null,
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "activeVersionId": null,
+  "updatedAt": "2026-06-01T14:49:28.215Z",
+  "createdAt": "2026-06-01T14:49:28.215Z",
+  "isArchived": false,
+  "versionCounter": 1,
+  "triggerCount": 0
+}

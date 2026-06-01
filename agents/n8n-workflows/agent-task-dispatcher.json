@@ -1,0 +1,138 @@
+{
+  "name": "agent-task-dispatcher",
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "n2",
+      "name": "Fetch sprint issues",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        300
+      ],
+      "parameters": {
+        "url": "https://api.github.com/repos/TheSocialChicken/BeerGame-TheNextLevel/issues?labels=sprint%3A+current&state=open&per_page=50",
+        "method": "GET",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer "
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "n3",
+      "name": "Route by agent label",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        300
+      ],
+      "parameters": {
+        "jsCode": "\nconst issues = $input.all().map(i => i.json);\nconst routes = { 'agent: gearbox': 'gearbox', 'agent: canvas': 'canvas', 'agent: pipeline': 'pipeline', 'agent: watchdog': 'watchdog' };\nconst dispatched = [];\nfor (const issue of issues) {\n  const labels = (issue.labels || []).map(l => l.name);\n  for (const [label, agent] of Object.entries(routes)) {\n    if (labels.includes(label)) {\n      dispatched.push({ json: { issue_number: issue.number, title: issue.title, agent, url: issue.html_url, body: issue.body } });\n    }\n  }\n}\nreturn dispatched;\n",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "n4",
+      "name": "Post dispatch comment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1020,
+        300
+      ],
+      "parameters": {
+        "url": "=https://api.github.com/repos/TheSocialChicken/BeerGame-TheNextLevel/issues/{{ $json.issue_number }}/comments",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer "
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "body",
+              "value": "=\ud83e\udd16 Dispatched to **{{ $json.agent }}** agent. Issue picked up by task dispatcher."
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "n1": {
+      "main": [
+        [
+          {
+            "node": "n2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "n2": {
+      "main": [
+        [
+          {
+            "node": "n3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "n3": {
+      "main": [
+        [
+          {
+            "node": "n4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "active": false,
+  "versionId": "c70f8384-3e24-4cbb-88cb-ca5779ea94bb",
+  "id": "XRze9GmJsYK9AWmn",
+  "description": null,
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "activeVersionId": null,
+  "updatedAt": "2026-06-01T14:49:22.782Z",
+  "createdAt": "2026-06-01T14:49:22.782Z",
+  "isArchived": false,
+  "versionCounter": 1,
+  "triggerCount": 0
+}

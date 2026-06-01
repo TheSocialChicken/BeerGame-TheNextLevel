@@ -1,0 +1,168 @@
+{
+  "name": "deploy-on-staging-merge",
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "path": "deploy-staging-webhook",
+        "httpMethod": "POST",
+        "responseMode": "onReceived"
+      },
+      "webhookId": "deploy-staging-webhook"
+    },
+    {
+      "id": "n2",
+      "name": "Check PR merged to staging",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        300
+      ],
+      "parameters": {
+        "jsCode": "\nconst body = $input.first().json.body || $input.first().json;\nconst isMerged = body.pull_request?.merged === true;\nconst isStaging = body.pull_request?.base?.ref === 'staging';\nif (!isMerged || !isStaging) return [];\nreturn [{ json: { sha: body.pull_request.head.sha, pr_number: body.number, repo: body.repository?.full_name } }];\n",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "n3",
+      "name": "Trigger Ansible via n8n webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        300
+      ],
+      "parameters": {
+        "url": "https://n8n.valuechainhackers.xyz/webhook/ansible-deploy",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer "
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "variant",
+              "value": "={{ $json.variant || 'all' }}"
+            },
+            {
+              "name": "environment",
+              "value": "staging"
+            },
+            {
+              "name": "git_ref",
+              "value": "={{ $json.sha }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "n4",
+      "name": "Post GitHub commit status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1020,
+        300
+      ],
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('Check PR merged to staging').item.json.repo }}/statuses/{{ $('Check PR merged to staging').item.json.sha }}",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer "
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "state",
+              "value": "pending"
+            },
+            {
+              "name": "context",
+              "value": "deploy/staging"
+            },
+            {
+              "name": "description",
+              "value": "Ansible deploy triggered"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "n1": {
+      "main": [
+        [
+          {
+            "node": "n2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "n2": {
+      "main": [
+        [
+          {
+            "node": "n3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "n3": {
+      "main": [
+        [
+          {
+            "node": "n4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "active": false,
+  "versionId": "ae1a32b8-af75-4e14-a297-c2d6e63b777e",
+  "id": "pVwxEOEQxO6mR93V",
+  "description": null,
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "activeVersionId": null,
+  "updatedAt": "2026-06-01T14:49:21.516Z",
+  "createdAt": "2026-06-01T14:49:21.516Z",
+  "isArchived": false,
+  "versionCounter": 1,
+  "triggerCount": 0
+}

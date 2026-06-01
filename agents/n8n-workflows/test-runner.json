@@ -1,0 +1,109 @@
+{
+  "name": "test-runner",
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "path": "test-runner-webhook",
+        "httpMethod": "POST",
+        "responseMode": "onReceived"
+      },
+      "webhookId": "test-runner-webhook"
+    },
+    {
+      "id": "n2",
+      "name": "Extract push context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        300
+      ],
+      "parameters": {
+        "jsCode": "\nconst body = $input.first().json.body || $input.first().json;\nif (!body.ref) return [];\nreturn [{ json: { ref: body.ref, sha: body.after, repo: body.repository?.full_name, pusher: body.pusher?.name } }];\n",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "n3",
+      "name": "Trigger GitHub Actions CI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        300
+      ],
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $json.repo }}/actions/workflows/ci.yml/dispatches",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer "
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "ref",
+              "value": "={{ $json.ref }}"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "n1": {
+      "main": [
+        [
+          {
+            "node": "n2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "n2": {
+      "main": [
+        [
+          {
+            "node": "n3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "active": false,
+  "versionId": "0f8ab224-5c04-4340-b698-069326121fab",
+  "id": "gGzNe68pwklHWTgR",
+  "description": null,
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "activeVersionId": null,
+  "updatedAt": "2026-06-01T14:49:25.603Z",
+  "createdAt": "2026-06-01T14:49:25.603Z",
+  "isArchived": false,
+  "versionCounter": 1,
+  "triggerCount": 0
+}

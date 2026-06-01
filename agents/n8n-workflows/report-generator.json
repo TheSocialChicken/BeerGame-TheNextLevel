@@ -1,0 +1,147 @@
+{
+  "name": "report-generator",
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "path": "report-webhook",
+        "httpMethod": "POST",
+        "responseMode": "onReceived"
+      },
+      "webhookId": "report-webhook"
+    },
+    {
+      "id": "n2",
+      "name": "Extract session data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        300
+      ],
+      "parameters": {
+        "jsCode": "\nconst body = $input.first().json.body || $input.first().json;\nif (body.event !== 'session.ended') return [];\nreturn [{ json: { session_id: body.session_id, variant: body.variant, players: body.players, ended_at: body.ended_at } }];\n",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "n3",
+      "name": "Fetch full session from backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        300
+      ],
+      "parameters": {
+        "url": "=https://{{ $json.variant }}.valuechainhackers.xyz/api/sessions/{{ $json.session_id }}",
+        "method": "GET",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer "
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "n4",
+      "name": "Trigger Quarto report generation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1020,
+        300
+      ],
+      "parameters": {
+        "url": "http://10.0.4.10:8080/reports/generate",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer "
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session_id",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "name": "variant",
+              "value": "={{ $json.variant }}"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "n1": {
+      "main": [
+        [
+          {
+            "node": "n2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "n2": {
+      "main": [
+        [
+          {
+            "node": "n3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "n3": {
+      "main": [
+        [
+          {
+            "node": "n4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "active": false,
+  "versionId": "a74789a6-cf01-4615-ae37-3fb6844480e9",
+  "id": "zeFeUUQsZgyzYubp",
+  "description": null,
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "activeVersionId": null,
+  "updatedAt": "2026-06-01T14:49:26.854Z",
+  "createdAt": "2026-06-01T14:49:26.854Z",
+  "isArchived": false,
+  "versionCounter": 1,
+  "triggerCount": 0
+}
