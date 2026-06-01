@@ -1,0 +1,53 @@
+---
+# Unlock KeePass vault and extract secrets into Ansible facts.
+# Requires: KEEPASS_MASTER_PASSWORD env var, beergame.kdbx checked out from TheSocialChicken/vault
+
+- name: Clone vault repo
+  ansible.builtin.git:
+    repo: "git@github.com:TheSocialChicken/vault.git"
+    dest: "/tmp/beergame-vault"
+    version: main
+    force: true
+  no_log: true
+
+- name: Extract SERVER_HOST from vault
+  ansible.builtin.shell: |
+    echo "$KEEPASS_MASTER_PASSWORD" | keepassxc-cli show -q -a Password \
+      /tmp/beergame-vault/beergame.kdbx "GitHub/SERVER_HOST"
+  environment:
+    KEEPASS_MASTER_PASSWORD: "{{ lookup('env', 'KEEPASS_MASTER_PASSWORD') }}"
+  register: vault_server_host
+  no_log: true
+  changed_when: false
+
+- name: Extract postgres password from vault
+  ansible.builtin.shell: |
+    echo "$KEEPASS_MASTER_PASSWORD" | keepassxc-cli show -q -a Password \
+      /tmp/beergame-vault/beergame.kdbx "postgres/beergame"
+  environment:
+    KEEPASS_MASTER_PASSWORD: "{{ lookup('env', 'KEEPASS_MASTER_PASSWORD') }}"
+  register: vault_postgres_password
+  no_log: true
+  changed_when: false
+
+- name: Extract redis token from vault
+  ansible.builtin.shell: |
+    echo "$KEEPASS_MASTER_PASSWORD" | keepassxc-cli show -q -a Password \
+      /tmp/beergame-vault/beergame.kdbx "redis/beergame"
+  environment:
+    KEEPASS_MASTER_PASSWORD: "{{ lookup('env', 'KEEPASS_MASTER_PASSWORD') }}"
+  register: vault_redis_token
+  no_log: true
+  changed_when: false
+
+- name: Set vault facts
+  ansible.builtin.set_fact:
+    vault_server_host: "{{ vault_server_host.stdout | trim }}"
+    vault_postgres_password: "{{ vault_postgres_password.stdout | trim }}"
+    vault_redis_token: "{{ vault_redis_token.stdout | trim }}"
+  no_log: true
+
+- name: Clean up vault clone
+  ansible.builtin.file:
+    path: /tmp/beergame-vault
+    state: absent
