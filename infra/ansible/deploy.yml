@@ -1,0 +1,80 @@
+---
+# BeerGame: The Next Level — Main Deploy Playbook
+# Triggered by GitHub Actions after CI passes.
+#
+# Variables (passed via -e):
+#   variant:     which game variant to deploy (or "all")
+#   environment: staging | production
+#   git_ref:     git SHA being deployed
+#
+# Secrets:
+#   KEEPASS_MASTER_PASSWORD: env var, used to unlock vault if needed
+
+- name: Deploy BeerGame variant(s)
+  hosts: "{{ environment }}"
+  become: true
+  gather_facts: true
+
+  vars:
+    app_base_dir: /opt/beergame
+    docker_compose_cmd: docker compose
+    variants_all:
+      - classic
+      - blockchain
+      - sustainable_worlds
+      - hostile_takeover
+      - unlimited_growth
+      - world_disasters
+      - new_technology
+      - ruthless_optimization
+    variants_to_deploy: >-
+      {{ [variant] if variant != 'all' else variants_all }}
+
+  pre_tasks:
+    - name: Verify Docker is running
+      ansible.builtin.service:
+        name: docker
+        state: started
+      tags: [preflight]
+
+    - name: Ensure app base directory exists
+      ansible.builtin.file:
+        path: "{{ app_base_dir }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+      tags: [preflight]
+
+  tasks:
+    - name: Pull latest code
+      ansible.builtin.git:
+        repo: "https://github.com/TheSocialChicken/BeerGame-TheNextLevel.git"
+        dest: "{{ app_base_dir }}/repo"
+        version: "{{ git_ref }}"
+        force: true
+      tags: [deploy]
+
+    - name: Deploy each variant
+      ansible.builtin.include_tasks: tasks/deploy_variant.yml
+      loop: "{{ variants_to_deploy }}"
+      loop_control:
+        loop_var: current_variant
+      tags: [deploy]
+
+  post_tasks:
+    - name: Verify Traefik is routing correctly
+      ansible.builtin.uri:
+        url: "https://{{ 'staging-' if environment == 'staging' else '' }}{{ current_variant }}.valuechainhackers.xyz/health"
+        status_code: 200
+      loop: "{{ variants_to_deploy }}"
+      loop_control:
+        loop_var: current_variant
+      register: health_checks
+      ignore_errors: true
+      tags: [verify]
+
+    - name: Report deploy status
+      ansible.builtin.debug:
+        msg: "Deployed {{ variants_to_deploy | join(', ') }} to {{ environment }} at {{ git_ref }}"
+      tags: [verify]

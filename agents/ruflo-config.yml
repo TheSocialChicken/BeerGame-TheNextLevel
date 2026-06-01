@@ -1,0 +1,207 @@
+# BeerGame: The Next Level — Ruflo Swarm Configuration
+#
+# Install ruflo: npx ruflo init
+# Then reference this file for project-specific config.
+# Ruflo plugins used: core, swarm, rag-memory, goals, sparc,
+#                     workflows, intelligence, adr, testgen, browser,
+#                     security-audit, cost-tracker, ruvllm, federation
+
+project:
+  name: beergame-next-level
+  description: Multi-variant Beer Game serious game platform
+  repo: https://github.com/TheSocialChicken/BeerGame-TheNextLevel
+
+# ─────────────────────────────────────────────
+# LLM Provider Routing
+# Swarm routes tasks to appropriate model based on complexity + cost.
+# ─────────────────────────────────────────────
+providers:
+  primary:
+    type: claude
+    model: claude-sonnet-4-6
+    use_for: [architecture, complex_reasoning, code_review, planning]
+
+  performance:
+    type: claude
+    model: claude-opus-4-6
+    use_for: [critical_decisions, epic_planning]
+    # Use sparingly — highest cost
+
+  fast:
+    type: claude
+    model: claude-haiku-4-5
+    use_for: [simple_tasks, infra, formatting, boilerplate]
+
+  cost_saving:
+    type: openrouter
+    models:
+      - deepseek/deepseek-coder-v2     # Strong coding, near free
+      - qwen/qwen-2.5-coder-32b-instruct  # Strong coding, free tier
+      - perplexity/sonar               # Research with web search
+    use_for: [routine_coding, research, test_generation]
+
+  local:
+    type: ollama
+    host: http://proxmox-server:11434  # Replace with actual Proxmox IP
+    models:
+      - qwen2.5-coder:7b    # Fast local coding
+      - llama3.2:3b          # Lightweight general tasks
+    use_for: [frequent_tasks, sensitive_data, offline_capable]
+
+# ─────────────────────────────────────────────
+# Agent Swarm Definitions
+# Maps our team roles to ruflo swarm agents.
+# ─────────────────────────────────────────────
+swarm:
+  coordinator:
+    name: claude-scrum
+    role: Scrum Master and Lead Architect
+    prompt_file: agents/prompts/claude-scrum.md
+    provider: primary
+    tools: [github, file_system, bash, web_search]
+
+  agents:
+    - name: research
+      role: Research — information gathering (SPARC: Specification)
+      prompt_file: agents/prompts/research.md
+      provider: cost_saving  # perplexity/sonar preferred
+      triggers:
+        - label: "pipeline: research"
+      outputs:
+        - type: file
+          path: docs/research/{slug}.md
+        - type: github_comment
+
+    - name: architect
+      role: Game Design — specs and mechanics (SPARC: Specification)
+      prompt_file: agents/prompts/architect.md
+      provider: primary
+      triggers:
+        - label: "pipeline: planning"
+          filter: "area: design"
+      outputs:
+        - type: file
+          path: docs/game-design/{variant}-spec.md
+
+    - name: gearbox
+      role: Backend Engineer — Python/FastAPI (SPARC: Refinement)
+      prompt_file: agents/prompts/gearbox.md
+      provider: cost_saving  # deepseek-coder for routine, sonnet for complex
+      triggers:
+        - label: "agent: gearbox"
+      outputs:
+        - type: code
+          paths: [core/, variants/]
+        - type: pull_request
+          base: staging
+
+    - name: canvas
+      role: Frontend Engineer — SvelteKit/Maps (SPARC: Refinement)
+      prompt_file: agents/prompts/canvas.md
+      provider: cost_saving  # qwen-coder for routine, sonnet for complex
+      triggers:
+        - label: "agent: canvas"
+      outputs:
+        - type: code
+          paths: [frontend/]
+        - type: pull_request
+          base: staging
+
+    - name: pipeline
+      role: DevOps — Ansible/Docker/n8n (all SPARC phases)
+      prompt_file: agents/prompts/pipeline.md
+      provider: fast  # haiku for infra tasks
+      triggers:
+        - label: "agent: pipeline"
+      outputs:
+        - type: code
+          paths: [infra/, .github/, agents/n8n-workflows/]
+
+    - name: watchdog
+      role: QA Engineer — tests and coverage (SPARC: Completion)
+      prompt_file: agents/prompts/watchdog.md
+      provider: fast  # haiku for test gen, local ollama for simple tests
+      triggers:
+        - label: "agent: watchdog"
+        - event: pull_request_opened
+      outputs:
+        - type: github_comment
+          format: test_report
+        - type: code
+          paths: ["**/tests/"]
+
+# ─────────────────────────────────────────────
+# Ruflo Plugins
+# ─────────────────────────────────────────────
+plugins:
+  - ruflo-core          # Required — server, health, discovery
+  - ruflo-swarm         # Multi-agent coordination
+  - ruflo-rag-memory    # Cross-session memory + hybrid search
+  - ruflo-goals         # Break epics into tasks automatically
+  - ruflo-sparc         # 5-phase dev methodology (maps to our pipeline)
+  - ruflo-workflows     # Reusable task templates
+  - ruflo-intelligence  # Agents learn from past successes
+  - ruflo-adr           # Architecture Decision Records (syncs with docs/adr/)
+  - ruflo-testgen       # Auto-generate missing tests (used by Watchdog)
+  - ruflo-browser       # Playwright automation (used by Canvas + Watchdog)
+  - ruflo-security-audit  # CVE scanning (runs weekly)
+  - ruflo-cost-tracker  # Track token usage per agent, alert on budget
+  - ruflo-ruvllm        # Local LLM routing via Ollama on Proxmox
+  - ruflo-federation    # Cross-machine agent collaboration (dev machine ↔ server machine)
+
+# ─────────────────────────────────────────────
+# SPARC Pipeline Mapping
+# Our 6-stage pipeline maps to ruflo-sparc phases.
+# ─────────────────────────────────────────────
+sparc_pipeline:
+  specification:      # Stage 1: Research + Stage 2: Planning
+    agents: [research, architect]
+    output: docs/game-design/{variant}-spec.md
+  pseudocode:         # Planning detail
+    agents: [architect, claude-scrum]
+    output: docs/game-design/{variant}-pseudocode.md
+  architecture:       # Technical spec
+    agents: [claude-scrum, gearbox]
+    output: docs/adr/{date}-{feature}.md
+  refinement:         # Stage 3: Development + Stage 4: Acceptance
+    agents: [gearbox, canvas]
+    review_by: claude-scrum
+  completion:         # Stage 5: Testing + Stage 6: Feedback
+    agents: [watchdog]
+    report: core/reporting/templates/{variant}.qmd
+
+# ─────────────────────────────────────────────
+# Federation (cross-machine)
+# Dev machine (this one) ↔ Server machine (OpenVPN)
+# ─────────────────────────────────────────────
+federation:
+  enabled: true
+  nodes:
+    - name: dev-machine
+      role: planning, code_generation, review
+      models: [claude-sonnet-4-6, claude-haiku-4-5]
+
+    - name: server-machine
+      role: deployment, testing, local_llm, n8n
+      models: [ollama/qwen2.5-coder:7b, ollama/llama3.2:3b]
+      services: [n8n, ansible, docker]
+
+# ─────────────────────────────────────────────
+# Memory (ruflo-rag-memory)
+# ─────────────────────────────────────────────
+memory:
+  backend: vector  # Uses ruflo-agentdb (built-in)
+  persist: true
+  namespaces:
+    - beergame-architecture   # Architectural decisions
+    - beergame-game-design    # Variant specs and mechanics
+    - beergame-patterns       # Code patterns that worked well
+    - beergame-bugs           # Known bugs and their fixes
+
+# ─────────────────────────────────────────────
+# Cost Tracking (ruflo-cost-tracker)
+# ─────────────────────────────────────────────
+cost:
+  budget_per_sprint: 10.00  # USD
+  alert_threshold: 0.80     # Alert at 80% budget
+  prefer_local_above: 0.001 # Per-token price — route to Ollama if above this

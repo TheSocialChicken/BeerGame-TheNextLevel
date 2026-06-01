@@ -1,0 +1,44 @@
+---
+# Deploy a single variant via Docker Compose
+# Loop variable: current_variant
+
+- name: "[{{ current_variant }}] Ensure variant directory exists"
+  ansible.builtin.file:
+    path: "{{ app_base_dir }}/{{ current_variant }}"
+    state: directory
+    mode: '0755'
+
+- name: "[{{ current_variant }}] Copy Docker Compose file"
+  ansible.builtin.copy:
+    src: "{{ app_base_dir }}/repo/infra/docker/{{ current_variant }}/docker-compose.yml"
+    dest: "{{ app_base_dir }}/{{ current_variant }}/docker-compose.yml"
+    remote_src: true
+    mode: '0644'
+
+- name: "[{{ current_variant }}] Copy environment file"
+  ansible.builtin.template:
+    src: "{{ app_base_dir }}/repo/infra/docker/{{ current_variant }}/.env.j2"
+    dest: "{{ app_base_dir }}/{{ current_variant }}/.env"
+    mode: '0600'
+  no_log: true  # Never log env files
+
+- name: "[{{ current_variant }}] Pull latest images"
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_base_dir }}/{{ current_variant }}"
+    pull: always
+
+- name: "[{{ current_variant }}] Deploy with Docker Compose"
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_base_dir }}/{{ current_variant }}"
+    state: present
+    recreate: always
+  register: deploy_result
+
+- name: "[{{ current_variant }}] Wait for container healthy"
+  community.docker.docker_container_info:
+    name: "beergame-{{ current_variant }}-backend"
+  register: container_info
+  until: container_info.container.State.Health.Status == 'healthy'
+  retries: 10
+  delay: 6
+  ignore_errors: true  # Not all containers have healthcheck yet
