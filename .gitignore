@@ -8,6 +8,9 @@ dist/
 .coverage
 htmlcov/
 data/
+*.cover
+.claude-flow/
+claude-flow.config.export.json
 
 # Node
 node_modules/
