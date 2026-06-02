@@ -1,5 +1,7 @@
-export const API_BASE = import.meta.env.PUBLIC_API_BASE ?? 'http://localhost:8000';
-export const WS_BASE = import.meta.env.PUBLIC_WS_BASE ?? 'ws://localhost:8000';
+import { env } from '$env/dynamic/public';
+
+export const API_BASE = env.PUBLIC_API_BASE ?? 'http://localhost:8000';
+export const WS_BASE = env.PUBLIC_WS_BASE ?? 'ws://localhost:8000';
 
 export interface GameState {
 	game_id: string;

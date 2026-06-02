@@ -1,0 +1,96 @@
+> import uuid
+> from core.models import (
+>     GameConfig,
+>     GamePhase,
+>     GameState,
+>     PlayerRole,
+>     PlayerState,
+>     ROLE_ORDER,
+> )
+> from .order_processor import advance_shipments, fulfill_orders, place_orders, accrue_costs
+  
+  
+> class GameEngine:
+>     def create_game(
+>         self,
+>         config: GameConfig | None = None,
+>         ai_roles: set[PlayerRole] | None = None,
+>     ) -> GameState:
+>         cfg = config or GameConfig()
+>         ai_roles = ai_roles or set()
+  
+>         players: dict[PlayerRole, PlayerState] = {}
+>         for role in ROLE_ORDER:
+              # Each role starts with initial inventory and 2 rounds of pipeline stock
+>             ps = PlayerState(
+>                 role=role,
+>                 inventory=cfg.initial_inventory,
+>                 backlog=cfg.initial_backlog,
+>                 is_ai=(role in ai_roles),
+>             )
+              # Pre-fill shipment pipeline (standard Beer Game setup)
+>             from core.models import IncomingShipment
+>             for delay in range(1, cfg.shipping_delay + 1):
+>                 ps.incoming_shipments.append(
+>                     IncomingShipment(quantity=cfg.initial_inventory // 2, arrives_in_rounds=delay)
+>                 )
+>             players[role] = ps
+  
+>         return GameState(
+>             game_id=str(uuid.uuid4()),
+>             config=cfg,
+>             players=players,
+>             phase=GamePhase.WAITING,
+>         )
+  
+>     def start_game(self, state: GameState) -> GameState:
+>         state.phase = GamePhase.ACTIVE
+>         return state
+  
+>     def submit_order(self, state: GameState, role: PlayerRole, quantity: int) -> GameState:
+>         if state.phase != GamePhase.ACTIVE:
+>             raise ValueError(f"Game not active (phase={state.phase})")
+>         if role not in state.players:
+>             raise ValueError(f"Role {role} not in game")
+>         if quantity < 0:
+>             raise ValueError("Order quantity cannot be negative")
+  
+>         state.orders_this_round[role] = quantity
+>         return state
+  
+>     def process_round(self, state: GameState) -> GameState:
+>         """Advance game by one round. Call after all orders submitted."""
+>         if state.phase != GamePhase.ACTIVE:
+!             raise ValueError("Game not active")
+  
+>         round_idx = state.current_round
+>         demand = state.config.demand_pattern[round_idx % len(state.config.demand_pattern)]
+>         state.customer_demand_history.append(demand)
+  
+>         state = advance_shipments(state)
+>         state = fulfill_orders(state, demand)
+>         state = place_orders(state)
+>         state = accrue_costs(state)
+  
+>         state.current_round += 1
+>         state.orders_this_round = {}
+  
+>         if state.current_round >= state.config.num_rounds:
+>             state.phase = GamePhase.FINISHED
+  
+>         return state
+  
+>     def get_visible_state(self, state: GameState, role: PlayerRole) -> dict:
+>         """Return only what this role can see (no upstream inventory)."""
+>         ps = state.players[role]
+>         return {
+>             "game_id": state.game_id,
+>             "round": state.current_round,
+>             "phase": state.phase,
+>             "role": role,
+>             "inventory": ps.inventory,
+>             "backlog": ps.backlog,
+>             "last_order": ps.last_order,
+>             "cumulative_cost": ps.cumulative_cost,
+>             "incoming_shipments": [s.model_dump() for s in ps.incoming_shipments],
+>         }

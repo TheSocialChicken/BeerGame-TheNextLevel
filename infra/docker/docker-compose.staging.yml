@@ -1,0 +1,62 @@
+services:
+  beergame-backend:
+    image: ghcr.io/thesocialchicken/beergame-backend:staging
+    container_name: beergame-classic-backend
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://beergame-redis:6379
+    depends_on:
+      beergame-redis:
+        condition: service_healthy
+    networks:
+      - traefik-stack_default
+      - beergame-internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-stack_default"
+      # REST API
+      - "traefik.http.routers.beergame-api.rule=Host(`staging-classic-api.valuechainhackers.xyz`)"
+      - "traefik.http.routers.beergame-api.entrypoints=websecure"
+      - "traefik.http.routers.beergame-api.tls=true"
+      - "traefik.http.routers.beergame-api.tls.certresolver=myresolver"
+      - "traefik.http.routers.beergame-api.service=beergame-api-svc"
+      - "traefik.http.services.beergame-api-svc.loadbalancer.server.port=8000"
+
+  beergame-frontend:
+    image: ghcr.io/thesocialchicken/beergame-frontend:staging
+    container_name: beergame-classic-frontend
+    restart: unless-stopped
+    environment:
+      - PUBLIC_API_BASE=https://staging-classic-api.valuechainhackers.xyz
+      - PUBLIC_WS_BASE=wss://staging-classic-api.valuechainhackers.xyz
+    depends_on:
+      - beergame-backend
+    networks:
+      - traefik-stack_default
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-stack_default"
+      - "traefik.http.routers.beergame-web.rule=Host(`staging-classic.valuechainhackers.xyz`)"
+      - "traefik.http.routers.beergame-web.entrypoints=websecure"
+      - "traefik.http.routers.beergame-web.tls=true"
+      - "traefik.http.routers.beergame-web.tls.certresolver=myresolver"
+      - "traefik.http.routers.beergame-web.service=beergame-web-svc"
+      - "traefik.http.services.beergame-web-svc.loadbalancer.server.port=3000"
+
+  beergame-redis:
+    image: redis:7-alpine
+    container_name: beergame-classic-redis
+    restart: unless-stopped
+    networks:
+      - beergame-internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+networks:
+  traefik-stack_default:
+    external: true
+  beergame-internal:
+    driver: bridge
