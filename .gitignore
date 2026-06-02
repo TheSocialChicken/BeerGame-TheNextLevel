@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+dist/
+.coverage
+htmlcov/
+data/
+
+# Node
+node_modules/
