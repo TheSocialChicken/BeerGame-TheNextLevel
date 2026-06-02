@@ -1,0 +1,74 @@
+{
+  "version": "3.5",
+  "agents": {
+    "defaultType": "coder",
+    "autoSpawn": false,
+    "maxConcurrent": 8,
+    "timeout": 300000,
+    "providers": [
+      {
+        "name": "primary",
+        "type": "claude",
+        "model": "claude-sonnet-4-6",
+        "useFor": ["architecture", "complex_reasoning", "code_review", "planning"]
+      },
+      {
+        "name": "fast",
+        "type": "claude",
+        "model": "claude-haiku-4-5",
+        "useFor": ["simple_tasks", "infra", "formatting", "boilerplate"]
+      },
+      {
+        "name": "cost_saving",
+        "type": "openrouter",
+        "baseUrl": "https://openrouter.ai/api/v1",
+        "models": [
+          "nvidia/nemotron-3-super-120b-a12b:free",
+          "meta-llama/llama-3.3-70b-instruct:free",
+          "google/gemma-4-31b-it:free"
+        ],
+        "useFor": ["routine_coding", "research", "test_generation"]
+      },
+      {
+        "name": "local",
+        "type": "ollama",
+        "host": "http://100.95.236.57:11434",
+        "models": ["llama3.1:8b", "deepseek-r1:7b"],
+        "useFor": ["frequent_tasks", "sensitive_data", "offline_capable"]
+      }
+    ]
+  },
+  "swarm": {
+    "topology": "hierarchical",
+    "maxAgents": 8,
+    "autoScale": false,
+    "coordinationStrategy": "leader",
+    "healthCheckInterval": 30000
+  },
+  "memory": {
+    "backend": "hybrid",
+    "persistPath": "./data/memory",
+    "cacheSize": 1000,
+    "enableHNSW": true,
+    "vectorDimension": 384
+  },
+  "mcp": {
+    "serverHost": "localhost",
+    "serverPort": 3000,
+    "autoStart": false,
+    "transportType": "stdio",
+    "tools": []
+  },
+  "cli": {
+    "colorOutput": true,
+    "interactive": true,
+    "verbosity": "normal",
+    "outputFormat": "text",
+    "progressStyle": "spinner"
+  },
+  "hooks": {
+    "enabled": true,
+    "autoExecute": true,
+    "hooks": []
+  }
+}
