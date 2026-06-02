@@ -1,0 +1,24 @@
+[2026-06-02T17:55:23.074Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "```json\n{\n  \"vulnerabilities\": [],\n  \"riskScore\": 5,\n  \"recommendations\": [\n    \"Add input validation on quantity field in submit_order — currently accepts any int, should validate range (0 to reasonable max)\",\n    \"Pydantic models have proper validation (Field constraints) — good baseline\",\n    \"No hardcoded secrets, no SQL injection risk (no DB calls in reviewed code), no XSS (server-side only)\",\n    \"No dependencies exposed yet — check requirements.txt when available for known vulns\",\n    \"Game state passed by reference — ensure state copies are deep when persisting to prevent mutation attacks\",\n    \"role not validated against expected enum set in submit_order — could accept invalid role names (Pydantic will catch at API boundary if proper models used)\"\n  ]\n}\n```\n\n**Summary:** Core engine code is clean. No critical issues. Add quantity bounds validation, verify role enum enforcement at API layer, check dependency audit once requirements locked.\n",
+  "parsedOutput": {
+    "vulnerabilities": [],
+    "riskScore": 5,
+    "recommendations": [
+      "Add input validation on quantity field in submit_order — currently accepts any int, should validate range (0 to reasonable max)",
+      "Pydantic models have proper validation (Field constraints) — good baseline",
+      "No hardcoded secrets, no SQL injection risk (no DB calls in reviewed code), no XSS (server-side only)",
+      "No dependencies exposed yet — check requirements.txt when available for known vulns",
+      "Game state passed by reference — ensure state copies are deep when persisting to prevent mutation attacks",
+      "role not validated against expected enum set in submit_order — could accept invalid role names (Pydantic will catch at API boundary if proper models used)"
+    ]
+  },
+  "durationMs": 23846,
+  "model": "haiku",
+  "sandboxMode": "strict",
+  "workerType": "audit",
+  "timestamp": "2026-06-02T17:55:23.074Z",
+  "executionId": "audit_1780422899228_sc9rg9"
+}

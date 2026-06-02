@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from backend.api.games import router as games_router
 from backend.api.websocket import router as ws_router
 

@@ -1,0 +1,106 @@
+[2026-06-02T12:23:44.853Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "99.45% statement coverage. Only 1 line uncovered. But behavioral gaps significant. Here's the breakdown:\n\n---\n\n## Coverage Summary\n\n| File | Coverage | Critical Gap |\n|------|----------|--------------|\n| `game_engine.py` | 98% | Line 64 — `process_round()` error path never hit |\n| `order_processor.py` | 100% | No unit tests — only tested indirectly |\n| `rule_based.py` | ~100% | Stress/edge cases missing |\n| `game.py` | ~100% | Boundary configs untested |\n\n---\n\n## Critical Gaps + Skeletons\n\n### 1. Line 64 — error path never tested (`game_engine.py:64`)\n\n```python\n# tests/core/test_engine.py\n\ndef test_process_round_on_waiting_game():\n    engine = GameEngine()\n    state = engine.create_game()\n    # state.phase == WAITING — NOT started\n    with pytest.raises(ValueError, match=\"Game not active\"):\n        engine.process_round(state)\n\ndef test_process_round_on_finished_game():\n    engine = GameEngine()\n    state = engine.create_game(ai_roles=list(PlayerRole))\n    engine.start_game(state)\n    while state.phase != GamePhase.FINISHED:\n        engine.process_round(state)\n    with pytest.raises(ValueError, match=\"Game not active\"):\n        engine.process_round(state)\n```\n\n### 2. Order overwrite behavior (undefined — KeyError or silent overwrite?)\n\n```python\ndef test_submit_order_twice_same_role():\n    engine = GameEngine()\n    state = engine.create_game()\n    engine.start_game(state)\n    engine.submit_order(state, PlayerRole.RETAILER, 4)\n    # Second submit: should overwrite silently or raise?\n    engine.submit_order(state, PlayerRole.RETAILER, 8)\n    assert state.orders_this_round[PlayerRole.RETAILER] == 8  # or expect ValueError\n```\n\n### 3. Invalid role in `get_visible_state()` (KeyError risk)\n\n```python\ndef test_get_visible_state_invalid_role():\n    engine = GameEngine()\n    state = engine.create_game()\n    engine.start_game(state)\n    with pytest.raises(KeyError):\n        engine.get_visible_state(state, \"NONEXISTENT_ROLE\")\n```\n\n### 4. Boundary configs\n\n```python\ndef test_create_game_single_round():\n    engine = GameEngine()\n    config = GameConfig(num_rounds=1)\n    state = engine.create_game(config=config, ai_roles=list(PlayerRole))\n    engine.start_game(state)\n    engine.process_round(state)\n    assert state.phase == GamePhase.FINISHED\n\ndef test_game_config_zero_costs():\n    config = GameConfig(holding_cost=0.0, backlog_cost=0.0)\n    ps = PlayerState(role=PlayerRole.RETAILER, inventory=10, backlog=5)\n    assert ps.round_cost(config) == 0.0\n\ndef test_game_config_empty_demand_pattern():\n    with pytest.raises(Exception):  # define expected behavior\n        GameConfig(demand_pattern=[])\n```\n\n### 5. `order_processor.py` unit tests (all 4 functions currently only tested indirectly)\n\n```python\n# tests/core/test_order_processor.py  ← NEW FILE\n\nfrom core.engine.order_processor import advance_shipments, fulfill_orders, place_orders, accrue_costs\n\ndef test_advance_shipments_delivers_on_time():\n    state = make_game_state()  # helper that sets up minimal state\n    # Add shipment arriving in 1 round\n    state.players[PlayerRole.RETAILER].incoming_shipments = [\n        IncomingShipment(quantity=10, arrives_in_rounds=1)\n    ]\n    advance_shipments(state)\n    assert state.players[PlayerRole.RETAILER].inventory == initial + 10\n\ndef test_fulfill_orders_deep_backlog():\n    \"\"\"Demand >> inventory — backlog grows correctly.\"\"\"\n    state = make_game_state(initial_inventory=2, customer_demand=100)\n    fulfill_orders(state)\n    assert state.players[PlayerRole.RETAILER].backlog == 98\n\ndef test_accrue_costs_custom_rates():\n    config = GameConfig(holding_cost=2.0, backlog_cost=5.0)\n    state = make_game_state(config=config)\n    state.players[PlayerRole.RETAILER].inventory = 10\n    state.players[PlayerRole.RETAILER].backlog = 3\n    accrue_costs(state)\n    expected = 10 * 2.0 + 3 * 5.0\n    assert state.players[PlayerRole.RETAILER].cumulative_cost == expected\n```\n\n### 6. Bullwhip effect integration test\n\n```python\ndef test_bullwhip_amplification():\n    \"\"\"Demand doubles midgame — upstream roles amplify order spikes.\"\"\"\n    engine = GameEngine()\n    pattern = [4] * 13 + [8] * 13  # demand doubles at round 13\n    config = GameConfig(demand_pattern=pattern, num_rounds=26)\n    state = engine.create_game(config=config, ai_roles=list(PlayerRole))\n    engine.start_game(state)\n    while state.phase != GamePhase.FINISHED:\n        engine.process_round(state)\n    \n    # Factory (most upstream) should see higher order variance than retailer\n    factory_history = state.players[PlayerRole.FACTORY].order_history\n    retailer_history = state.players[PlayerRole.RETAILER].order_history\n    factory_variance = statistics.variance(factory_history)\n    retailer_variance = statistics.variance(retailer_history)\n    assert factory_variance > retailer_variance  # bullwhip\n```\n\n### 7. `start_game()` idempotency\n\n```python\ndef test_start_game_already_active():\n    engine = GameEngine()\n    state = engine.create_game()\n    engine.start_game(state)\n    with pytest.raises(Exception):  # verify behavior: error or no-op?\n        engine.start_game(state)\n```\n\n---\n\n## Priority Order\n\n| # | Gap | Risk |\n|---|-----|------|\n| 1 | `game_engine.py:64` error path | **Critical** — only uncovered line |\n| 2 | Order overwrite behavior | **High** — silent data loss possible |\n| 3 | Invalid role in `get_visible_state` | **High** — KeyError in prod |\n| 4 | Order processor unit tests | **High** — indirect-only means refactor breaks silently |\n| 5 | Boundary configs (num_rounds=1, zero costs) | Medium |\n| 6 | Bullwhip integration test | Medium — validates core game theory |\n| 7 | `start_game` on ACTIVE game | Low |\n\nAdd ~15 targeted tests → behavioral confidence matches statement coverage.\n",
+  "parsedOutput": {
+    "sections": [
+      {
+        "title": "Coverage Summary",
+        "content": "\n| File | Coverage | Critical Gap |\n|------|----------|--------------|\n| `game_engine.py` | 98% | Line 64 — `process_round()` error path never hit |\n| `order_processor.py` | 100% | No unit tests — only tested indirectly |\n| `rule_based.py` | ~100% | Stress/edge cases missing |\n| `game.py` | ~100% | Boundary configs untested |\n\n---\n\n",
+        "level": 2
+      },
+      {
+        "title": "Critical Gaps + Skeletons",
+        "content": "\n",
+        "level": 2
+      },
+      {
+        "title": "1. Line 64 — error path never tested (`game_engine.py:64`)",
+        "content": "\n```python\n",
+        "level": 3
+      },
+      {
+        "title": "tests/core/test_engine.py",
+        "content": "\ndef test_process_round_on_waiting_game():\n    engine = GameEngine()\n    state = engine.create_game()\n    # state.phase == WAITING — NOT started\n    with pytest.raises(ValueError, match=\"Game not active\"):\n        engine.process_round(state)\n\ndef test_process_round_on_finished_game():\n    engine = GameEngine()\n    state = engine.create_game(ai_roles=list(PlayerRole))\n    engine.start_game(state)\n    while state.phase != GamePhase.FINISHED:\n        engine.process_round(state)\n    with pytest.raises(ValueError, match=\"Game not active\"):\n        engine.process_round(state)\n```\n\n",
+        "level": 1
+      },
+      {
+        "title": "2. Order overwrite behavior (undefined — KeyError or silent overwrite?)",
+        "content": "\n```python\ndef test_submit_order_twice_same_role():\n    engine = GameEngine()\n    state = engine.create_game()\n    engine.start_game(state)\n    engine.submit_order(state, PlayerRole.RETAILER, 4)\n    # Second submit: should overwrite silently or raise?\n    engine.submit_order(state, PlayerRole.RETAILER, 8)\n    assert state.orders_this_round[PlayerRole.RETAILER] == 8  # or expect ValueError\n```\n\n",
+        "level": 3
+      },
+      {
+        "title": "3. Invalid role in `get_visible_state()` (KeyError risk)",
+        "content": "\n```python\ndef test_get_visible_state_invalid_role():\n    engine = GameEngine()\n    state = engine.create_game()\n    engine.start_game(state)\n    with pytest.raises(KeyError):\n        engine.get_visible_state(state, \"NONEXISTENT_ROLE\")\n```\n\n",
+        "level": 3
+      },
+      {
+        "title": "4. Boundary configs",
+        "content": "\n```python\ndef test_create_game_single_round():\n    engine = GameEngine()\n    config = GameConfig(num_rounds=1)\n    state = engine.create_game(config=config, ai_roles=list(PlayerRole))\n    engine.start_game(state)\n    engine.process_round(state)\n    assert state.phase == GamePhase.FINISHED\n\ndef test_game_config_zero_costs():\n    config = GameConfig(holding_cost=0.0, backlog_cost=0.0)\n    ps = PlayerState(role=PlayerRole.RETAILER, inventory=10, backlog=5)\n    assert ps.round_cost(config) == 0.0\n\ndef test_game_config_empty_demand_pattern():\n    with pytest.raises(Exception):  # define expected behavior\n        GameConfig(demand_pattern=[])\n```\n\n",
+        "level": 3
+      },
+      {
+        "title": "5. `order_processor.py` unit tests (all 4 functions currently only tested indirectly)",
+        "content": "\n```python\n",
+        "level": 3
+      },
+      {
+        "title": "tests/core/test_order_processor.py  ← NEW FILE",
+        "content": "\nfrom core.engine.order_processor import advance_shipments, fulfill_orders, place_orders, accrue_costs\n\ndef test_advance_shipments_delivers_on_time():\n    state = make_game_state()  # helper that sets up minimal state\n    # Add shipment arriving in 1 round\n    state.players[PlayerRole.RETAILER].incoming_shipments = [\n        IncomingShipment(quantity=10, arrives_in_rounds=1)\n    ]\n    advance_shipments(state)\n    assert state.players[PlayerRole.RETAILER].inventory == initial + 10\n\ndef test_fulfill_orders_deep_backlog():\n    \"\"\"Demand >> inventory — backlog grows correctly.\"\"\"\n    state = make_game_state(initial_inventory=2, customer_demand=100)\n    fulfill_orders(state)\n    assert state.players[PlayerRole.RETAILER].backlog == 98\n\ndef test_accrue_costs_custom_rates():\n    config = GameConfig(holding_cost=2.0, backlog_cost=5.0)\n    state = make_game_state(config=config)\n    state.players[PlayerRole.RETAILER].inventory = 10\n    state.players[PlayerRole.RETAILER].backlog = 3\n    accrue_costs(state)\n    expected = 10 * 2.0 + 3 * 5.0\n    assert state.players[PlayerRole.RETAILER].cumulative_cost == expected\n```\n\n",
+        "level": 1
+      },
+      {
+        "title": "6. Bullwhip effect integration test",
+        "content": "\n```python\ndef test_bullwhip_amplification():\n    \"\"\"Demand doubles midgame — upstream roles amplify order spikes.\"\"\"\n    engine = GameEngine()\n    pattern = [4] * 13 + [8] * 13  # demand doubles at round 13\n    config = GameConfig(demand_pattern=pattern, num_rounds=26)\n    state = engine.create_game(config=config, ai_roles=list(PlayerRole))\n    engine.start_game(state)\n    while state.phase != GamePhase.FINISHED:\n        engine.process_round(state)\n    \n    # Factory (most upstream) should see higher order variance than retailer\n    factory_history = state.players[PlayerRole.FACTORY].order_history\n    retailer_history = state.players[PlayerRole.RETAILER].order_history\n    factory_variance = statistics.variance(factory_history)\n    retailer_variance = statistics.variance(retailer_history)\n    assert factory_variance > retailer_variance  # bullwhip\n```\n\n",
+        "level": 3
+      },
+      {
+        "title": "7. `start_game()` idempotency",
+        "content": "\n```python\ndef test_start_game_already_active():\n    engine = GameEngine()\n    state = engine.create_game()\n    engine.start_game(state)\n    with pytest.raises(Exception):  # verify behavior: error or no-op?\n        engine.start_game(state)\n```\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "Priority Order",
+        "content": "| # | Gap | Risk |\n|---|-----|------|\n| 1 | `game_engine.py:64` error path | **Critical** — only uncovered line |\n| 2 | Order overwrite behavior | **High** — silent data loss possible |\n| 3 | Invalid role in `get_visible_state` | **High** — KeyError in prod |\n| 4 | Order processor unit tests | **High** — indirect-only means refactor breaks silently |\n| 5 | Boundary configs (num_rounds=1, zero costs) | Medium |\n| 6 | Bullwhip integration test | Medium — validates core game theory |\n| 7 | `start_game` on ACTIVE game | Low |\n\nAdd ~15 targeted tests → behavioral confidence matches statement coverage.",
+        "level": 2
+      }
+    ],
+    "codeBlocks": [
+      {
+        "language": "python",
+        "code": "# tests/core/test_engine.py\n\ndef test_process_round_on_waiting_game():\n    engine = GameEngine()\n    state = engine.create_game()\n    # state.phase == WAITING — NOT started\n    with pytest.raises(ValueError, match=\"Game not active\"):\n        engine.process_round(state)\n\ndef test_process_round_on_finished_game():\n    engine = GameEngine()\n    state = engine.create_game(ai_roles=list(PlayerRole))\n    engine.start_game(state)\n    while state.phase != GamePhase.FINISHED:\n        engine.process_round(state)\n    with pytest.raises(ValueError, match=\"Game not active\"):\n        engine.process_round(state)"
+      },
+      {
+        "language": "python",
+        "code": "def test_submit_order_twice_same_role():\n    engine = GameEngine()\n    state = engine.create_game()\n    engine.start_game(state)\n    engine.submit_order(state, PlayerRole.RETAILER, 4)\n    # Second submit: should overwrite silently or raise?\n    engine.submit_order(state, PlayerRole.RETAILER, 8)\n    assert state.orders_this_round[PlayerRole.RETAILER] == 8  # or expect ValueError"
+      },
+      {
+        "language": "python",
+        "code": "def test_get_visible_state_invalid_role():\n    engine = GameEngine()\n    state = engine.create_game()\n    engine.start_game(state)\n    with pytest.raises(KeyError):\n        engine.get_visible_state(state, \"NONEXISTENT_ROLE\")"
+      },
+      {
+        "language": "python",
+        "code": "def test_create_game_single_round():\n    engine = GameEngine()\n    config = GameConfig(num_rounds=1)\n    state = engine.create_game(config=config, ai_roles=list(PlayerRole))\n    engine.start_game(state)\n    engine.process_round(state)\n    assert state.phase == GamePhase.FINISHED\n\ndef test_game_config_zero_costs():\n    config = GameConfig(holding_cost=0.0, backlog_cost=0.0)\n    ps = PlayerState(role=PlayerRole.RETAILER, inventory=10, backlog=5)\n    assert ps.round_cost(config) == 0.0\n\ndef test_game_config_empty_demand_pattern():\n    with pytest.raises(Exception):  # define expected behavior\n        GameConfig(demand_pattern=[])"
+      },
+      {
+        "language": "python",
+        "code": "# tests/core/test_order_processor.py  ← NEW FILE\n\nfrom core.engine.order_processor import advance_shipments, fulfill_orders, place_orders, accrue_costs\n\ndef test_advance_shipments_delivers_on_time():\n    state = make_game_state()  # helper that sets up minimal state\n    # Add shipment arriving in 1 round\n    state.players[PlayerRole.RETAILER].incoming_shipments = [\n        IncomingShipment(quantity=10, arrives_in_rounds=1)\n    ]\n    advance_shipments(state)\n    assert state.players[PlayerRole.RETAILER].inventory == initial + 10\n\ndef test_fulfill_orders_deep_backlog():\n    \"\"\"Demand >> inventory — backlog grows correctly.\"\"\"\n    state = make_game_state(initial_inventory=2, customer_demand=100)\n    fulfill_orders(state)\n    assert state.players[PlayerRole.RETAILER].backlog == 98\n\ndef test_accrue_costs_custom_rates():\n    config = GameConfig(holding_cost=2.0, backlog_cost=5.0)\n    state = make_game_state(config=config)\n    state.players[PlayerRole.RETAILER].inventory = 10\n    state.players[PlayerRole.RETAILER].backlog = 3\n    accrue_costs(state)\n    expected = 10 * 2.0 + 3 * 5.0\n    assert state.players[PlayerRole.RETAILER].cumulative_cost == expected"
+      },
+      {
+        "language": "python",
+        "code": "def test_bullwhip_amplification():\n    \"\"\"Demand doubles midgame — upstream roles amplify order spikes.\"\"\"\n    engine = GameEngine()\n    pattern = [4] * 13 + [8] * 13  # demand doubles at round 13\n    config = GameConfig(demand_pattern=pattern, num_rounds=26)\n    state = engine.create_game(config=config, ai_roles=list(PlayerRole))\n    engine.start_game(state)\n    while state.phase != GamePhase.FINISHED:\n        engine.process_round(state)\n    \n    # Factory (most upstream) should see higher order variance than retailer\n    factory_history = state.players[PlayerRole.FACTORY].order_history\n    retailer_history = state.players[PlayerRole.RETAILER].order_history\n    factory_variance = statistics.variance(factory_history)\n    retailer_variance = statistics.variance(retailer_history)\n    assert factory_variance > retailer_variance  # bullwhip"
+      },
+      {
+        "language": "python",
+        "code": "def test_start_game_already_active():\n    engine = GameEngine()\n    state = engine.create_game()\n    engine.start_game(state)\n    with pytest.raises(Exception):  # verify behavior: error or no-op?\n        engine.start_game(state)"
+      }
+    ]
+  },
+  "durationMs": 206062,
+  "model": "sonnet",
+  "sandboxMode": "permissive",
+  "workerType": "testgaps",
+  "timestamp": "2026-06-02T12:23:44.852Z",
+  "executionId": "testgaps_1780402818790_zu70h2"
+}

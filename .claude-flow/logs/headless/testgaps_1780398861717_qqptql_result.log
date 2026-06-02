@@ -1,0 +1,79 @@
+[2026-06-02T11:16:05.314Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "## Test Coverage Gaps\n\n**Current state:** 26 tests, ~60% function coverage, ~40% path coverage.\n\n---\n\n### Untested Functions (`order_processor.py` — never isolated)\n\n| Function | File:Line | Gap |\n|----------|-----------|-----|\n| `advance_shipments()` | `core/engine/order_processor.py:4` | Only called via `process_round`, no unit tests |\n| `fulfill_orders()` | `core/engine/order_processor.py:17` | Same |\n| `place_orders()` | `core/engine/order_processor.py:56` | Same |\n| `accrue_costs()` | `core/engine/order_processor.py:85` | Same |\n| `Order` class | `core/models/order.py:5` | Never instantiated in tests |\n\n---\n\n### Edge Case Gaps\n\n**`fulfill_orders` — insufficient inventory:**\n```python\ndef test_fulfill_orders_insufficient_inventory_creates_backlog():\n    state = make_state(inventory=2, backlog=0)\n    state = fulfill_orders(state, customer_demand=8)\n    retailer = state.players[PlayerRole.RETAILER]\n    assert retailer.inventory == 0\n    assert retailer.backlog == 6  # 8 demand - 2 inventory\n```\n\n**`advance_shipments` — multiple arrivals same round:**\n```python\ndef test_advance_shipments_multiple_arrivals():\n    # Two shipments both arrives_in_rounds=1\n    state = make_state(incoming_shipments=[\n        IncomingShipment(quantity=5, arrives_in_rounds=1),\n        IncomingShipment(quantity=3, arrives_in_rounds=1),\n    ])\n    state = advance_shipments(state)\n    assert state.players[PlayerRole.RETAILER].inventory == initial + 8\n    assert len(state.players[PlayerRole.RETAILER].incoming_shipments) == 0\n```\n\n**`accrue_costs` — custom cost rates:**\n```python\ndef test_accrue_costs_custom_rates():\n    config = GameConfig(holding_cost=2.5, backlog_cost=7.5)\n    state = make_state(config=config, inventory=4, backlog=2)\n    state = accrue_costs(state)\n    retailer = state.players[PlayerRole.RETAILER]\n    assert retailer.cumulative_cost == pytest.approx(4*2.5 + 2*7.5)\n```\n\n**`OrderUpToAI` — over-stocked (should order 0, not negative):**\n```python\ndef test_order_up_to_ai_no_negative_orders():\n    ai = OrderUpToAI(PlayerRole.RETAILER)\n    state = make_state(inventory=100, backlog=0, pipeline=50)\n    order = ai.decide_order(state)\n    assert order >= 0\n```\n\n**`GameEngine.submit_order` — duplicate submission:**\n```python\ndef test_submit_order_duplicate_raises():\n    engine = GameEngine()\n    state = engine.create_game()\n    state = engine.start_game(state)\n    state = engine.submit_order(state, PlayerRole.RETAILER, 4)\n    with pytest.raises(ValueError):\n        engine.submit_order(state, PlayerRole.RETAILER, 4)\n```\n\n**`GameConfig` — demand pattern shorter than `num_rounds` (wrap):**\n```python\ndef test_demand_pattern_wraps():\n    config = GameConfig(num_rounds=10, demand_pattern=[2, 4])\n    engine = GameEngine()\n    # Round 5 demand should be 2 (pattern[5 % 2])\n    assert engine._get_demand(config, round_idx=5) == 2\n```\n\n---\n\n### Integration Gaps\n\n**Multi-round supply chain propagation:**\n```python\ndef test_demand_propagates_upstream_5_rounds():\n    engine = GameEngine()\n    state = engine.create_game(config=GameConfig(num_rounds=5, demand_pattern=[4]*5))\n    state = engine.start_game(state)\n    for _ in range(5):\n        for role in PlayerRole:\n            state = engine.submit_order(state, role, OrderUpToAI(role).decide_order(state))\n        state = engine.process_round(state)\n    assert state.status == GameStatus.FINISHED\n    assert all(ps.cumulative_cost > 0 for ps in state.players.values())\n```\n\n**Backlog clears before new demand:**\n```python\ndef test_backlog_cleared_before_new_demand():\n    # Setup: retailer has backlog=3, new demand=2, incoming shipment=6\n    # Expected: backlog=0, inventory=1 (6 - 3 - 2)\n    ...\n```\n\n**Cost accumulation is monotonic:**\n```python\ndef test_cumulative_cost_never_decreases():\n    costs = []\n    for round_num in range(game_length):\n        state = engine.process_round(state)\n        costs.append(state.players[PlayerRole.RETAILER].cumulative_cost)\n    assert costs == sorted(costs)\n```\n\n---\n\n### Priority Order\n\n1. **High** — isolate `order_processor.py` functions (currently untestable failures would be swallowed by `process_round`)\n2. **High** — backlog/inventory edge cases (core game mechanic correctness)\n3. **Medium** — `Order` model validation\n4. **Medium** — multi-round integration test\n5. **Low** — `OrderUpToAI` pipeline scenarios\n",
+  "parsedOutput": {
+    "sections": [
+      {
+        "title": "Test Coverage Gaps",
+        "content": "\n**Current state:** 26 tests, ~60% function coverage, ~40% path coverage.\n\n---\n\n",
+        "level": 2
+      },
+      {
+        "title": "Untested Functions (`order_processor.py` — never isolated)",
+        "content": "\n| Function | File:Line | Gap |\n|----------|-----------|-----|\n| `advance_shipments()` | `core/engine/order_processor.py:4` | Only called via `process_round`, no unit tests |\n| `fulfill_orders()` | `core/engine/order_processor.py:17` | Same |\n| `place_orders()` | `core/engine/order_processor.py:56` | Same |\n| `accrue_costs()` | `core/engine/order_processor.py:85` | Same |\n| `Order` class | `core/models/order.py:5` | Never instantiated in tests |\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "Edge Case Gaps",
+        "content": "\n**`fulfill_orders` — insufficient inventory:**\n```python\ndef test_fulfill_orders_insufficient_inventory_creates_backlog():\n    state = make_state(inventory=2, backlog=0)\n    state = fulfill_orders(state, customer_demand=8)\n    retailer = state.players[PlayerRole.RETAILER]\n    assert retailer.inventory == 0\n    assert retailer.backlog == 6  # 8 demand - 2 inventory\n```\n\n**`advance_shipments` — multiple arrivals same round:**\n```python\ndef test_advance_shipments_multiple_arrivals():\n    # Two shipments both arrives_in_rounds=1\n    state = make_state(incoming_shipments=[\n        IncomingShipment(quantity=5, arrives_in_rounds=1),\n        IncomingShipment(quantity=3, arrives_in_rounds=1),\n    ])\n    state = advance_shipments(state)\n    assert state.players[PlayerRole.RETAILER].inventory == initial + 8\n    assert len(state.players[PlayerRole.RETAILER].incoming_shipments) == 0\n```\n\n**`accrue_costs` — custom cost rates:**\n```python\ndef test_accrue_costs_custom_rates():\n    config = GameConfig(holding_cost=2.5, backlog_cost=7.5)\n    state = make_state(config=config, inventory=4, backlog=2)\n    state = accrue_costs(state)\n    retailer = state.players[PlayerRole.RETAILER]\n    assert retailer.cumulative_cost == pytest.approx(4*2.5 + 2*7.5)\n```\n\n**`OrderUpToAI` — over-stocked (should order 0, not negative):**\n```python\ndef test_order_up_to_ai_no_negative_orders():\n    ai = OrderUpToAI(PlayerRole.RETAILER)\n    state = make_state(inventory=100, backlog=0, pipeline=50)\n    order = ai.decide_order(state)\n    assert order >= 0\n```\n\n**`GameEngine.submit_order` — duplicate submission:**\n```python\ndef test_submit_order_duplicate_raises():\n    engine = GameEngine()\n    state = engine.create_game()\n    state = engine.start_game(state)\n    state = engine.submit_order(state, PlayerRole.RETAILER, 4)\n    with pytest.raises(ValueError):\n        engine.submit_order(state, PlayerRole.RETAILER, 4)\n```\n\n**`GameConfig` — demand pattern shorter than `num_rounds` (wrap):**\n```python\ndef test_demand_pattern_wraps():\n    config = GameConfig(num_rounds=10, demand_pattern=[2, 4])\n    engine = GameEngine()\n    # Round 5 demand should be 2 (pattern[5 % 2])\n    assert engine._get_demand(config, round_idx=5) == 2\n```\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "Integration Gaps",
+        "content": "\n**Multi-round supply chain propagation:**\n```python\ndef test_demand_propagates_upstream_5_rounds():\n    engine = GameEngine()\n    state = engine.create_game(config=GameConfig(num_rounds=5, demand_pattern=[4]*5))\n    state = engine.start_game(state)\n    for _ in range(5):\n        for role in PlayerRole:\n            state = engine.submit_order(state, role, OrderUpToAI(role).decide_order(state))\n        state = engine.process_round(state)\n    assert state.status == GameStatus.FINISHED\n    assert all(ps.cumulative_cost > 0 for ps in state.players.values())\n```\n\n**Backlog clears before new demand:**\n```python\ndef test_backlog_cleared_before_new_demand():\n    # Setup: retailer has backlog=3, new demand=2, incoming shipment=6\n    # Expected: backlog=0, inventory=1 (6 - 3 - 2)\n    ...\n```\n\n**Cost accumulation is monotonic:**\n```python\ndef test_cumulative_cost_never_decreases():\n    costs = []\n    for round_num in range(game_length):\n        state = engine.process_round(state)\n        costs.append(state.players[PlayerRole.RETAILER].cumulative_cost)\n    assert costs == sorted(costs)\n```\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "Priority Order",
+        "content": "1. **High** — isolate `order_processor.py` functions (currently untestable failures would be swallowed by `process_round`)\n2. **High** — backlog/inventory edge cases (core game mechanic correctness)\n3. **Medium** — `Order` model validation\n4. **Medium** — multi-round integration test\n5. **Low** — `OrderUpToAI` pipeline scenarios",
+        "level": 3
+      }
+    ],
+    "codeBlocks": [
+      {
+        "language": "python",
+        "code": "def test_fulfill_orders_insufficient_inventory_creates_backlog():\n    state = make_state(inventory=2, backlog=0)\n    state = fulfill_orders(state, customer_demand=8)\n    retailer = state.players[PlayerRole.RETAILER]\n    assert retailer.inventory == 0\n    assert retailer.backlog == 6  # 8 demand - 2 inventory"
+      },
+      {
+        "language": "python",
+        "code": "def test_advance_shipments_multiple_arrivals():\n    # Two shipments both arrives_in_rounds=1\n    state = make_state(incoming_shipments=[\n        IncomingShipment(quantity=5, arrives_in_rounds=1),\n        IncomingShipment(quantity=3, arrives_in_rounds=1),\n    ])\n    state = advance_shipments(state)\n    assert state.players[PlayerRole.RETAILER].inventory == initial + 8\n    assert len(state.players[PlayerRole.RETAILER].incoming_shipments) == 0"
+      },
+      {
+        "language": "python",
+        "code": "def test_accrue_costs_custom_rates():\n    config = GameConfig(holding_cost=2.5, backlog_cost=7.5)\n    state = make_state(config=config, inventory=4, backlog=2)\n    state = accrue_costs(state)\n    retailer = state.players[PlayerRole.RETAILER]\n    assert retailer.cumulative_cost == pytest.approx(4*2.5 + 2*7.5)"
+      },
+      {
+        "language": "python",
+        "code": "def test_order_up_to_ai_no_negative_orders():\n    ai = OrderUpToAI(PlayerRole.RETAILER)\n    state = make_state(inventory=100, backlog=0, pipeline=50)\n    order = ai.decide_order(state)\n    assert order >= 0"
+      },
+      {
+        "language": "python",
+        "code": "def test_submit_order_duplicate_raises():\n    engine = GameEngine()\n    state = engine.create_game()\n    state = engine.start_game(state)\n    state = engine.submit_order(state, PlayerRole.RETAILER, 4)\n    with pytest.raises(ValueError):\n        engine.submit_order(state, PlayerRole.RETAILER, 4)"
+      },
+      {
+        "language": "python",
+        "code": "def test_demand_pattern_wraps():\n    config = GameConfig(num_rounds=10, demand_pattern=[2, 4])\n    engine = GameEngine()\n    # Round 5 demand should be 2 (pattern[5 % 2])\n    assert engine._get_demand(config, round_idx=5) == 2"
+      },
+      {
+        "language": "python",
+        "code": "def test_demand_propagates_upstream_5_rounds():\n    engine = GameEngine()\n    state = engine.create_game(config=GameConfig(num_rounds=5, demand_pattern=[4]*5))\n    state = engine.start_game(state)\n    for _ in range(5):\n        for role in PlayerRole:\n            state = engine.submit_order(state, role, OrderUpToAI(role).decide_order(state))\n        state = engine.process_round(state)\n    assert state.status == GameStatus.FINISHED\n    assert all(ps.cumulative_cost > 0 for ps in state.players.values())"
+      },
+      {
+        "language": "python",
+        "code": "def test_backlog_cleared_before_new_demand():\n    # Setup: retailer has backlog=3, new demand=2, incoming shipment=6\n    # Expected: backlog=0, inventory=1 (6 - 3 - 2)\n    ..."
+      },
+      {
+        "language": "python",
+        "code": "def test_cumulative_cost_never_decreases():\n    costs = []\n    for round_num in range(game_length):\n        state = engine.process_round(state)\n        costs.append(state.players[PlayerRole.RETAILER].cumulative_cost)\n    assert costs == sorted(costs)"
+      }
+    ]
+  },
+  "durationMs": 103596,
+  "model": "sonnet",
+  "sandboxMode": "permissive",
+  "workerType": "testgaps",
+  "timestamp": "2026-06-02T11:16:05.313Z",
+  "executionId": "testgaps_1780398861717_qqptql"
+}

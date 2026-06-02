@@ -1,0 +1,92 @@
+> from core.models import GameState, PlayerState, PlayerRole, IncomingShipment, ROLE_ORDER
+  
+  
+> def advance_shipments(state: GameState) -> GameState:
+>     """Decrement shipment timers; deliver arrived units to inventory."""
+>     for ps in state.players.values():
+>         arrived = sum(s.quantity for s in ps.incoming_shipments if s.arrives_in_rounds == 1)
+>         ps.inventory += arrived
+>         ps.incoming_shipments = [
+>             IncomingShipment(quantity=s.quantity, arrives_in_rounds=s.arrives_in_rounds - 1)
+>             for s in ps.incoming_shipments
+>             if s.arrives_in_rounds > 1
+>         ]
+>     return state
+  
+  
+> def fulfill_orders(state: GameState, customer_demand: int) -> GameState:
+>     """
+>     Process fulfillment downstream → upstream.
+>     Retailer fills customer demand; each tier fills the tier below it.
+>     Shortfalls become backlog and are filled first next round.
+>     """
+>     demand_by_role: dict[PlayerRole, int] = {}
+>     roles = ROLE_ORDER  # retailer → wholesaler → distributor → factory
+  
+>     for i, role in enumerate(roles):
+>         if i == 0:
+>             demand_by_role[role] = customer_demand
+>         else:
+>             downstream = roles[i - 1]
+>             demand_by_role[role] = state.orders_this_round.get(downstream, 0)
+  
+>     for i, role in enumerate(roles):
+>         ps = state.players[role]
+>         demand = demand_by_role[role] + ps.backlog
+>         available = ps.inventory
+  
+>         shipped = min(available, demand)
+>         ps.inventory -= shipped
+>         ps.backlog = demand - shipped
+  
+          # Ship to downstream (or customer)
+>         if i > 0:
+>             downstream_role = roles[i - 1]
+>             downstream_ps = state.players[downstream_role]
+>             downstream_ps.incoming_shipments.append(
+>                 IncomingShipment(
+>                     quantity=shipped,
+>                     arrives_in_rounds=state.config.shipping_delay,
+>                 )
+>             )
+  
+>     return state
+  
+  
+> def place_orders(state: GameState) -> GameState:
+>     """
+>     Forward orders upstream.
+>     Each player's order goes into the supplier's incoming_orders queue.
+>     Factory 'orders' by scheduling production (adds to own shipment pipeline).
+>     """
+>     roles = ROLE_ORDER
+>     for i, role in enumerate(roles):
+>         order_qty = state.orders_this_round.get(role, 0)
+>         ps = state.players[role]
+>         ps.last_order = order_qty
+  
+>         if i < len(roles) - 1:
+              # Pass order to upstream supplier
+>             upstream_role = roles[i + 1]
+>             upstream_ps = state.players[upstream_role]
+>             upstream_ps.incoming_orders.append(order_qty)
+>         else:
+              # Factory: schedule production as incoming shipment to itself
+>             ps.incoming_shipments.append(
+>                 IncomingShipment(
+>                     quantity=order_qty,
+>                     arrives_in_rounds=state.config.order_delay,
+>                 )
+>             )
+  
+>     return state
+  
+  
+> def accrue_costs(state: GameState) -> GameState:
+>     for ps in state.players.values():
+>         cost = (
+>             ps.inventory * state.config.holding_cost
+>             + ps.backlog * state.config.backlog_cost
+>         )
+>         ps.cumulative_cost += cost
+>     return state

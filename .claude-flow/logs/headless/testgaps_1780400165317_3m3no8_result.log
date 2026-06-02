@@ -1,0 +1,88 @@
+[2026-06-02T11:37:58.158Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "Comprehensive gaps found. Here's the prioritized breakdown with test skeletons:\n\n---\n\n## Critical Gaps\n\n### 1. `order.py` — Zero direct tests\n```python\n# tests/test_models_order.py\nimport pytest\nfrom core.models.order import Order, IncomingShipment\n\ndef test_order_valid():\n    o = Order(from_role=PlayerRole.RETAILER, to_role=PlayerRole.WHOLESALER, quantity=10, order_round=1)\n    assert o.quantity == 10\n\ndef test_order_zero_quantity():\n    o = Order(..., quantity=0, ...)\n    assert o.quantity == 0\n\ndef test_order_negative_quantity_rejected():\n    with pytest.raises(ValidationError):\n        Order(..., quantity=-1, ...)\n\ndef test_incoming_shipment_valid():\n    s = IncomingShipment(quantity=5, arrives_in_rounds=2)\n    assert s.arrives_in_rounds == 2\n\ndef test_incoming_shipment_zero_arrives_rejected():\n    with pytest.raises(ValidationError):\n        IncomingShipment(quantity=5, arrives_in_rounds=0)\n```\n\n---\n\n### 2. `order_processor.py` — Functions only integration-covered\n\n```python\n# tests/test_order_processor.py\ndef test_advance_shipments_empty_list():\n    # advance_shipments with no pending shipments → no-op\n\ndef test_advance_shipments_zero_quantity():\n    # shipment.quantity=0 arriving → inventory unchanged\n\ndef test_fulfill_orders_missing_role_in_orders():\n    # orders_this_round missing a role → silent 0, no crash\n\ndef test_fulfill_orders_role_missing_from_players():\n    # players dict missing role → KeyError raised (documents current behavior)\n\ndef test_fulfill_orders_demand_exceeds_all_supply():\n    # demand > inventory + backlog capacity → all goes to backlog\n\ndef test_place_orders_empty_orders_this_round():\n    # .get() default 0 for missing role → factory schedules 0 production\n```\n\n---\n\n### 3. `game_engine.py` — Missing edge cases\n\n```python\ndef test_process_round_finished_game_raises():\n    game = engine.create_game(GameConfig(num_rounds=1, ...))\n    engine.process_round(game)  # finishes it\n    with pytest.raises(ValueError):\n        engine.process_round(game)  # should reject\n\ndef test_process_round_empty_demand_pattern_raises():\n    config = GameConfig(demand_pattern=[], ...)\n    with pytest.raises((IndexError, ValueError)):\n        # documents current unguarded behavior\n\ndef test_process_round_single_element_demand_pattern():\n    config = GameConfig(demand_pattern=[4], num_rounds=5, ...)\n    # modulo wrapping → all rounds use same demand\n\ndef test_submit_order_zero_quantity_allowed():\n    state = engine.create_game(...)\n    engine.submit_order(state, PlayerRole.RETAILER, 0)\n    assert state.orders_this_round[PlayerRole.RETAILER] == 0\n\ndef test_submit_order_overwrites_previous():\n    state = engine.create_game(...)\n    engine.submit_order(state, PlayerRole.RETAILER, 5)\n    engine.submit_order(state, PlayerRole.RETAILER, 10)\n    assert state.orders_this_round[PlayerRole.RETAILER] == 10\n\ndef test_get_visible_state_invalid_role_raises():\n    state = engine.create_game(...)\n    with pytest.raises(KeyError):\n        engine.get_visible_state(state, \"not_a_role\")\n```\n\n---\n\n### 4. `rule_based.py` AI — Edge cases\n\n```python\ndef test_order_up_to_empty_incoming_shipments():\n    # incoming_shipments=[] → pipeline=0, formula still runs\n\ndef test_order_up_to_large_backlog():\n    # backlog=100, inventory=0 → order = target + 100 - 0 (capped at 0 minimum)\n\ndef test_constant_order_negative_quantity_rejected():\n    with pytest.raises(ValidationError):\n        ConstantOrderAI(quantity=-1)\n\ndef test_constant_order_zero():\n    ai = ConstantOrderAI(quantity=0)\n    assert ai.decide_order(state, PlayerRole.RETAILER) == 0\n```\n\n---\n\n### 5. Missing integration tests\n\n```python\n# tests/test_integration.py\n\ndef test_mixed_human_ai_game():\n    # 1 human (RETAILER) + 3 AI → game only advances after human submits\n\ndef test_multi_round_backlog_clears():\n    # spike demand → 3 rounds high backlog → demand drops → backlog clears over time\n\ndef test_game_state_total_cost_empty_players():\n    state = GameState(players={}, ...)\n    assert state.total_cost() == 0.0\n\ndef test_is_round_complete_empty_players():\n    state = GameState(players={}, orders_this_round={}, ...)\n    assert state.is_round_complete() is True  # documents vacuous truth\n\ndef test_create_multiple_games_unique_ids():\n    g1 = engine.create_game(config)\n    g2 = engine.create_game(config)\n    assert g1.game_id != g2.game_id\n```\n\n---\n\n## Priority Map\n\n| Priority | Target | Gap |\n|----------|--------|-----|\n| HIGH | `order_processor.py` direct tests | Covered only via integration |\n| HIGH | `order.py` model tests | Zero tests |\n| HIGH | `process_round` finished-game guard | Untested crash path |\n| HIGH | `demand_pattern=[]` guard | IndexError not caught |\n| MED | Mixed human+AI integration | All-AI only tested |\n| MED | `ai_players/base.py` interface | Abstract class untested |\n| MED | Cost edge cases (float, zero) | Partial |\n| LOW | Backlog clearing multi-round | Gap in dynamics |\n| LOW | `reporting/__init__.py` | Entire module unimplemented |\n\nBiggest risk: `demand_pattern=[]` causes uncaught `IndexError` in `process_round` — document or guard it first.\n",
+  "parsedOutput": {
+    "sections": [
+      {
+        "title": "Critical Gaps",
+        "content": "\n",
+        "level": 2
+      },
+      {
+        "title": "1. `order.py` — Zero direct tests",
+        "content": "```python\n",
+        "level": 3
+      },
+      {
+        "title": "tests/test_models_order.py",
+        "content": "import pytest\nfrom core.models.order import Order, IncomingShipment\n\ndef test_order_valid():\n    o = Order(from_role=PlayerRole.RETAILER, to_role=PlayerRole.WHOLESALER, quantity=10, order_round=1)\n    assert o.quantity == 10\n\ndef test_order_zero_quantity():\n    o = Order(..., quantity=0, ...)\n    assert o.quantity == 0\n\ndef test_order_negative_quantity_rejected():\n    with pytest.raises(ValidationError):\n        Order(..., quantity=-1, ...)\n\ndef test_incoming_shipment_valid():\n    s = IncomingShipment(quantity=5, arrives_in_rounds=2)\n    assert s.arrives_in_rounds == 2\n\ndef test_incoming_shipment_zero_arrives_rejected():\n    with pytest.raises(ValidationError):\n        IncomingShipment(quantity=5, arrives_in_rounds=0)\n```\n\n---\n\n",
+        "level": 1
+      },
+      {
+        "title": "2. `order_processor.py` — Functions only integration-covered",
+        "content": "\n```python\n",
+        "level": 3
+      },
+      {
+        "title": "tests/test_order_processor.py",
+        "content": "def test_advance_shipments_empty_list():\n    # advance_shipments with no pending shipments → no-op\n\ndef test_advance_shipments_zero_quantity():\n    # shipment.quantity=0 arriving → inventory unchanged\n\ndef test_fulfill_orders_missing_role_in_orders():\n    # orders_this_round missing a role → silent 0, no crash\n\ndef test_fulfill_orders_role_missing_from_players():\n    # players dict missing role → KeyError raised (documents current behavior)\n\ndef test_fulfill_orders_demand_exceeds_all_supply():\n    # demand > inventory + backlog capacity → all goes to backlog\n\ndef test_place_orders_empty_orders_this_round():\n    # .get() default 0 for missing role → factory schedules 0 production\n```\n\n---\n\n",
+        "level": 1
+      },
+      {
+        "title": "3. `game_engine.py` — Missing edge cases",
+        "content": "\n```python\ndef test_process_round_finished_game_raises():\n    game = engine.create_game(GameConfig(num_rounds=1, ...))\n    engine.process_round(game)  # finishes it\n    with pytest.raises(ValueError):\n        engine.process_round(game)  # should reject\n\ndef test_process_round_empty_demand_pattern_raises():\n    config = GameConfig(demand_pattern=[], ...)\n    with pytest.raises((IndexError, ValueError)):\n        # documents current unguarded behavior\n\ndef test_process_round_single_element_demand_pattern():\n    config = GameConfig(demand_pattern=[4], num_rounds=5, ...)\n    # modulo wrapping → all rounds use same demand\n\ndef test_submit_order_zero_quantity_allowed():\n    state = engine.create_game(...)\n    engine.submit_order(state, PlayerRole.RETAILER, 0)\n    assert state.orders_this_round[PlayerRole.RETAILER] == 0\n\ndef test_submit_order_overwrites_previous():\n    state = engine.create_game(...)\n    engine.submit_order(state, PlayerRole.RETAILER, 5)\n    engine.submit_order(state, PlayerRole.RETAILER, 10)\n    assert state.orders_this_round[PlayerRole.RETAILER] == 10\n\ndef test_get_visible_state_invalid_role_raises():\n    state = engine.create_game(...)\n    with pytest.raises(KeyError):\n        engine.get_visible_state(state, \"not_a_role\")\n```\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "4. `rule_based.py` AI — Edge cases",
+        "content": "\n```python\ndef test_order_up_to_empty_incoming_shipments():\n    # incoming_shipments=[] → pipeline=0, formula still runs\n\ndef test_order_up_to_large_backlog():\n    # backlog=100, inventory=0 → order = target + 100 - 0 (capped at 0 minimum)\n\ndef test_constant_order_negative_quantity_rejected():\n    with pytest.raises(ValidationError):\n        ConstantOrderAI(quantity=-1)\n\ndef test_constant_order_zero():\n    ai = ConstantOrderAI(quantity=0)\n    assert ai.decide_order(state, PlayerRole.RETAILER) == 0\n```\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "5. Missing integration tests",
+        "content": "\n```python\n",
+        "level": 3
+      },
+      {
+        "title": "tests/test_integration.py",
+        "content": "\ndef test_mixed_human_ai_game():\n    # 1 human (RETAILER) + 3 AI → game only advances after human submits\n\ndef test_multi_round_backlog_clears():\n    # spike demand → 3 rounds high backlog → demand drops → backlog clears over time\n\ndef test_game_state_total_cost_empty_players():\n    state = GameState(players={}, ...)\n    assert state.total_cost() == 0.0\n\ndef test_is_round_complete_empty_players():\n    state = GameState(players={}, orders_this_round={}, ...)\n    assert state.is_round_complete() is True  # documents vacuous truth\n\ndef test_create_multiple_games_unique_ids():\n    g1 = engine.create_game(config)\n    g2 = engine.create_game(config)\n    assert g1.game_id != g2.game_id\n```\n\n---\n\n",
+        "level": 1
+      },
+      {
+        "title": "Priority Map",
+        "content": "| Priority | Target | Gap |\n|----------|--------|-----|\n| HIGH | `order_processor.py` direct tests | Covered only via integration |\n| HIGH | `order.py` model tests | Zero tests |\n| HIGH | `process_round` finished-game guard | Untested crash path |\n| HIGH | `demand_pattern=[]` guard | IndexError not caught |\n| MED | Mixed human+AI integration | All-AI only tested |\n| MED | `ai_players/base.py` interface | Abstract class untested |\n| MED | Cost edge cases (float, zero) | Partial |\n| LOW | Backlog clearing multi-round | Gap in dynamics |\n| LOW | `reporting/__init__.py` | Entire module unimplemented |\n\nBiggest risk: `demand_pattern=[]` causes uncaught `IndexError` in `process_round` — document or guard it first.",
+        "level": 2
+      }
+    ],
+    "codeBlocks": [
+      {
+        "language": "python",
+        "code": "# tests/test_models_order.py\nimport pytest\nfrom core.models.order import Order, IncomingShipment\n\ndef test_order_valid():\n    o = Order(from_role=PlayerRole.RETAILER, to_role=PlayerRole.WHOLESALER, quantity=10, order_round=1)\n    assert o.quantity == 10\n\ndef test_order_zero_quantity():\n    o = Order(..., quantity=0, ...)\n    assert o.quantity == 0\n\ndef test_order_negative_quantity_rejected():\n    with pytest.raises(ValidationError):\n        Order(..., quantity=-1, ...)\n\ndef test_incoming_shipment_valid():\n    s = IncomingShipment(quantity=5, arrives_in_rounds=2)\n    assert s.arrives_in_rounds == 2\n\ndef test_incoming_shipment_zero_arrives_rejected():\n    with pytest.raises(ValidationError):\n        IncomingShipment(quantity=5, arrives_in_rounds=0)"
+      },
+      {
+        "language": "python",
+        "code": "# tests/test_order_processor.py\ndef test_advance_shipments_empty_list():\n    # advance_shipments with no pending shipments → no-op\n\ndef test_advance_shipments_zero_quantity():\n    # shipment.quantity=0 arriving → inventory unchanged\n\ndef test_fulfill_orders_missing_role_in_orders():\n    # orders_this_round missing a role → silent 0, no crash\n\ndef test_fulfill_orders_role_missing_from_players():\n    # players dict missing role → KeyError raised (documents current behavior)\n\ndef test_fulfill_orders_demand_exceeds_all_supply():\n    # demand > inventory + backlog capacity → all goes to backlog\n\ndef test_place_orders_empty_orders_this_round():\n    # .get() default 0 for missing role → factory schedules 0 production"
+      },
+      {
+        "language": "python",
+        "code": "def test_process_round_finished_game_raises():\n    game = engine.create_game(GameConfig(num_rounds=1, ...))\n    engine.process_round(game)  # finishes it\n    with pytest.raises(ValueError):\n        engine.process_round(game)  # should reject\n\ndef test_process_round_empty_demand_pattern_raises():\n    config = GameConfig(demand_pattern=[], ...)\n    with pytest.raises((IndexError, ValueError)):\n        # documents current unguarded behavior\n\ndef test_process_round_single_element_demand_pattern():\n    config = GameConfig(demand_pattern=[4], num_rounds=5, ...)\n    # modulo wrapping → all rounds use same demand\n\ndef test_submit_order_zero_quantity_allowed():\n    state = engine.create_game(...)\n    engine.submit_order(state, PlayerRole.RETAILER, 0)\n    assert state.orders_this_round[PlayerRole.RETAILER] == 0\n\ndef test_submit_order_overwrites_previous():\n    state = engine.create_game(...)\n    engine.submit_order(state, PlayerRole.RETAILER, 5)\n    engine.submit_order(state, PlayerRole.RETAILER, 10)\n    assert state.orders_this_round[PlayerRole.RETAILER] == 10\n\ndef test_get_visible_state_invalid_role_raises():\n    state = engine.create_game(...)\n    with pytest.raises(KeyError):\n        engine.get_visible_state(state, \"not_a_role\")"
+      },
+      {
+        "language": "python",
+        "code": "def test_order_up_to_empty_incoming_shipments():\n    # incoming_shipments=[] → pipeline=0, formula still runs\n\ndef test_order_up_to_large_backlog():\n    # backlog=100, inventory=0 → order = target + 100 - 0 (capped at 0 minimum)\n\ndef test_constant_order_negative_quantity_rejected():\n    with pytest.raises(ValidationError):\n        ConstantOrderAI(quantity=-1)\n\ndef test_constant_order_zero():\n    ai = ConstantOrderAI(quantity=0)\n    assert ai.decide_order(state, PlayerRole.RETAILER) == 0"
+      },
+      {
+        "language": "python",
+        "code": "# tests/test_integration.py\n\ndef test_mixed_human_ai_game():\n    # 1 human (RETAILER) + 3 AI → game only advances after human submits\n\ndef test_multi_round_backlog_clears():\n    # spike demand → 3 rounds high backlog → demand drops → backlog clears over time\n\ndef test_game_state_total_cost_empty_players():\n    state = GameState(players={}, ...)\n    assert state.total_cost() == 0.0\n\ndef test_is_round_complete_empty_players():\n    state = GameState(players={}, orders_this_round={}, ...)\n    assert state.is_round_complete() is True  # documents vacuous truth\n\ndef test_create_multiple_games_unique_ids():\n    g1 = engine.create_game(config)\n    g2 = engine.create_game(config)\n    assert g1.game_id != g2.game_id"
+      }
+    ]
+  },
+  "durationMs": 112841,
+  "model": "sonnet",
+  "sandboxMode": "permissive",
+  "workerType": "testgaps",
+  "timestamp": "2026-06-02T11:37:58.158Z",
+  "executionId": "testgaps_1780400165317_3m3no8"
+}

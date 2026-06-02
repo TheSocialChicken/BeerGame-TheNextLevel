@@ -1,0 +1,103 @@
+[2026-06-02T11:09:14.699Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "Based on codebase analysis, generating JSON security report. Project stage: early (core models and engine exist; frontend/application code not yet present).\n\n```json\n{\n  \"vulnerabilities\": [\n    {\n      \"severity\": \"critical\",\n      \"file\": \"agents/ruflo-config.yml\",\n      \"line\": 45,\n      \"description\": \"Hardcoded Tailscale internal IP address (100.95.236.57) exposed in Git repository. Reveals internal network topology; enables lateral movement attacks if Tailscale network compromised.\"\n    },\n    {\n      \"severity\": \"critical\",\n      \"file\": \"agents/n8n-workflows/research-agent.json\",\n      \"line\": null,\n      \"description\": \"Ollama endpoint URL hardcoded as http://100.95.236.57:11434 in workflow JSON. Exposes internal infrastructure IP in version-controlled file; unencrypted HTTP connection.\"\n    },\n    {\n      \"severity\": \"critical\",\n      \"file\": \"agents/n8n-workflows/README.md\",\n      \"line\": 39,\n      \"description\": \"Internal Tailscale IP and Ollama service details documented in README. Sensitive infrastructure topology exposed in public repository.\"\n    },\n    {\n      \"severity\": \"high\",\n      \"file\": \".github/workflows/deploy.yml\",\n      \"line\": 81,\n      \"description\": \"SSH host key verification disabled (ANSIBLE_HOST_KEY_CHECKING=false). Allows man-in-the-middle attacks during Ansible deployment; attacker could intercept SSH and inject code.\"\n    },\n    {\n      \"severity\": \"high\",\n      \"file\": \"agents/n8n-workflows/research-agent.json\",\n      \"line\": null,\n      \"description\": \"Empty Bearer token in Ollama HTTP request ('Bearer '). Authorization header present but empty; fails silently or allows unauthenticated access.\"\n    },\n    {\n      \"severity\": \"high\",\n      \"file\": \".github/workflows/deploy.yml\",\n      \"line\": 53,\n      \"description\": \"ssh-keyscan used without hostname verification. Vulnerable to man-in-the-middle attacks if attacker controls DNS; SSH key injected into known_hosts unverified.\"\n    },\n    {\n      \"severity\": \"medium\",\n      \"file\": \"infra/ansible/inventory/staging.ini\",\n      \"line\": 3,\n      \"description\": \"Placeholder host configuration (STAGING_HOST_IP). If forgotten, deployment fails insecurely or connects to wrong host.\"\n    },\n    {\n      \"severity\": \"medium\",\n      \"file\": \"infra/ansible/inventory/production.ini\",\n      \"line\": 3,\n      \"description\": \"Placeholder production host (PROD_HOST_IP). Critical infrastructure identifier not configured; deployment cannot proceed without manual setup.\"\n    },\n    {\n      \"severity\": \"medium\",\n      \"file\": \".github/workflows/deploy.yml\",\n      \"line\": 50,\n      \"description\": \"SSH private key (DEPLOY_SSH_KEY) as GitHub Secret without rotation policy. If exposed, grants full deploy access with no documented expiry or rotation date.\"\n    },\n    {\n      \"severity\": \"medium\",\n      \"file\": \"infra/ansible/tasks/unlock_vault.yml\",\n      \"line\": 8,\n      \"description\": \"KeePass master password injected via environment variable without TTL or cleanup. Password visible in process list during execution if timing is right.\"\n    },\n    {\n      \"severity\": \"low\",\n      \"file\": \"agents/n8n-workflows/README.md\",\n      \"line\": 28,\n      \"description\": \"Webhook URLs for CI/CD triggers documented without authentication details. GitHub webhooks should verify X-Hub-Signature-256 payload signatures.\"\n    },\n    {\n      \"severity\": \"low\",\n      \"file\": \"docs/secrets.md\",\n      \"line\": 28,\n      \"description\": \"Example secret extraction command documented in public repo. While no actual secrets exposed, method is publicly known and documented.\"\n    }\n  ],\n  \"riskScore\": 72,\n  \"recommendations\": [\n    \"IMMEDIATE: Remove hardcoded Tailscale IP (100.95.236.57) from all config files. Use environment variables or GitHub Secrets (e.g., OLLAMA_HOST, OLLAMA_PORT).\",\n    \"IMMEDIATE: Enable SSH host key verification. Remove ANSIBLE_HOST_KEY_CHECKING=false from deploy.yml:81. Add ssh-keyscan with hostname verification or use ansible_ssh_common_args with StrictHostKeyChecking=accept-new.\",\n    \"IMMEDIATE: Move internal endpoints (Ollama, n8n, Tailscale IPs) to environment variables. Inject via GitHub Secrets at deploy time, never hardcode in YAML/JSON files.\",\n    \"IMMEDIATE: Remove internal network topology from public documentation. Move Ollama endpoint, Tailscale, and n8n details to private CLAUDE.md or internal wiki only.\",\n    \"HIGH: Configure proper Bearer token authentication. Replace empty token with real token from GitHub Secrets or remove header if not needed.\",\n    \"HIGH: Replace placeholder host IPs (STAGING_HOST_IP, PROD_HOST_IP) with actual values. Add pre-flight CI check validating inventory is populated before deploy.\",\n    \"HIGH: Implement SSH deploy key rotation policy. Document rotation schedule in CLAUDE.md (e.g., 90-day expiry). Add calendar reminder or CI alert.\",\n    \"HIGH: Clear KeePass master password from process memory after vault unlock. Add `echo '- clear unneeded secrets'` or use Ansible vault encryption instead of shell extraction.\",\n    \"MEDIUM: Verify GitHub webhook signatures (X-Hub-Signature-256) in n8n to prevent replay attacks. Add signature validation task.\",\n    \"MEDIUM: When application code is added (core/, variants/, frontend/), enable in CI: SQL injection linting (parameterized queries), XSS prevention (template escaping), dependency scanning (pip-audit, npm-audit).\",\n    \"MEDIUM: Document webhook authentication and rate-limiting strategy for n8n workflows.\",\n    \"LOW: Move secret extraction examples to private docs only (CLAUDE.md). Use vault repo (TheSocialChicken/vault) private access for all secret docs.\"\n  ]\n}\n```\n\n**Summary:**\n- **72/100 risk score** — critical issues are hardcoded IPs exposing infrastructure topology; high-severity items are MITM attack vectors (disabled SSH verification, empty auth tokens).\n- **No SQL injection/XSS found yet** — core code is simulation-only; risks apply when application/frontend code added.\n- **Dependency management is solid** — python-dotenv in use, asyncpg and FastAPI versions current.\n- **Key actions:** Remove hardcoded IPs → use env vars, enable SSH verification, implement key rotation policy, move internal topology to private docs.\n",
+  "parsedOutput": {
+    "vulnerabilities": [
+      {
+        "severity": "critical",
+        "file": "agents/ruflo-config.yml",
+        "line": 45,
+        "description": "Hardcoded Tailscale internal IP address (100.95.236.57) exposed in Git repository. Reveals internal network topology; enables lateral movement attacks if Tailscale network compromised."
+      },
+      {
+        "severity": "critical",
+        "file": "agents/n8n-workflows/research-agent.json",
+        "line": null,
+        "description": "Ollama endpoint URL hardcoded as http://100.95.236.57:11434 in workflow JSON. Exposes internal infrastructure IP in version-controlled file; unencrypted HTTP connection."
+      },
+      {
+        "severity": "critical",
+        "file": "agents/n8n-workflows/README.md",
+        "line": 39,
+        "description": "Internal Tailscale IP and Ollama service details documented in README. Sensitive infrastructure topology exposed in public repository."
+      },
+      {
+        "severity": "high",
+        "file": ".github/workflows/deploy.yml",
+        "line": 81,
+        "description": "SSH host key verification disabled (ANSIBLE_HOST_KEY_CHECKING=false). Allows man-in-the-middle attacks during Ansible deployment; attacker could intercept SSH and inject code."
+      },
+      {
+        "severity": "high",
+        "file": "agents/n8n-workflows/research-agent.json",
+        "line": null,
+        "description": "Empty Bearer token in Ollama HTTP request ('Bearer '). Authorization header present but empty; fails silently or allows unauthenticated access."
+      },
+      {
+        "severity": "high",
+        "file": ".github/workflows/deploy.yml",
+        "line": 53,
+        "description": "ssh-keyscan used without hostname verification. Vulnerable to man-in-the-middle attacks if attacker controls DNS; SSH key injected into known_hosts unverified."
+      },
+      {
+        "severity": "medium",
+        "file": "infra/ansible/inventory/staging.ini",
+        "line": 3,
+        "description": "Placeholder host configuration (STAGING_HOST_IP). If forgotten, deployment fails insecurely or connects to wrong host."
+      },
+      {
+        "severity": "medium",
+        "file": "infra/ansible/inventory/production.ini",
+        "line": 3,
+        "description": "Placeholder production host (PROD_HOST_IP). Critical infrastructure identifier not configured; deployment cannot proceed without manual setup."
+      },
+      {
+        "severity": "medium",
+        "file": ".github/workflows/deploy.yml",
+        "line": 50,
+        "description": "SSH private key (DEPLOY_SSH_KEY) as GitHub Secret without rotation policy. If exposed, grants full deploy access with no documented expiry or rotation date."
+      },
+      {
+        "severity": "medium",
+        "file": "infra/ansible/tasks/unlock_vault.yml",
+        "line": 8,
+        "description": "KeePass master password injected via environment variable without TTL or cleanup. Password visible in process list during execution if timing is right."
+      },
+      {
+        "severity": "low",
+        "file": "agents/n8n-workflows/README.md",
+        "line": 28,
+        "description": "Webhook URLs for CI/CD triggers documented without authentication details. GitHub webhooks should verify X-Hub-Signature-256 payload signatures."
+      },
+      {
+        "severity": "low",
+        "file": "docs/secrets.md",
+        "line": 28,
+        "description": "Example secret extraction command documented in public repo. While no actual secrets exposed, method is publicly known and documented."
+      }
+    ],
+    "riskScore": 72,
+    "recommendations": [
+      "IMMEDIATE: Remove hardcoded Tailscale IP (100.95.236.57) from all config files. Use environment variables or GitHub Secrets (e.g., OLLAMA_HOST, OLLAMA_PORT).",
+      "IMMEDIATE: Enable SSH host key verification. Remove ANSIBLE_HOST_KEY_CHECKING=false from deploy.yml:81. Add ssh-keyscan with hostname verification or use ansible_ssh_common_args with StrictHostKeyChecking=accept-new.",
+      "IMMEDIATE: Move internal endpoints (Ollama, n8n, Tailscale IPs) to environment variables. Inject via GitHub Secrets at deploy time, never hardcode in YAML/JSON files.",
+      "IMMEDIATE: Remove internal network topology from public documentation. Move Ollama endpoint, Tailscale, and n8n details to private CLAUDE.md or internal wiki only.",
+      "HIGH: Configure proper Bearer token authentication. Replace empty token with real token from GitHub Secrets or remove header if not needed.",
+      "HIGH: Replace placeholder host IPs (STAGING_HOST_IP, PROD_HOST_IP) with actual values. Add pre-flight CI check validating inventory is populated before deploy.",
+      "HIGH: Implement SSH deploy key rotation policy. Document rotation schedule in CLAUDE.md (e.g., 90-day expiry). Add calendar reminder or CI alert.",
+      "HIGH: Clear KeePass master password from process memory after vault unlock. Add `echo '- clear unneeded secrets'` or use Ansible vault encryption instead of shell extraction.",
+      "MEDIUM: Verify GitHub webhook signatures (X-Hub-Signature-256) in n8n to prevent replay attacks. Add signature validation task.",
+      "MEDIUM: When application code is added (core/, variants/, frontend/), enable in CI: SQL injection linting (parameterized queries), XSS prevention (template escaping), dependency scanning (pip-audit, npm-audit).",
+      "MEDIUM: Document webhook authentication and rate-limiting strategy for n8n workflows.",
+      "LOW: Move secret extraction examples to private docs only (CLAUDE.md). Use vault repo (TheSocialChicken/vault) private access for all secret docs."
+    ]
+  },
+  "durationMs": 66973,
+  "model": "haiku",
+  "sandboxMode": "strict",
+  "workerType": "audit",
+  "timestamp": "2026-06-02T11:09:14.698Z",
+  "executionId": "audit_1780398487725_k6f3db"
+}

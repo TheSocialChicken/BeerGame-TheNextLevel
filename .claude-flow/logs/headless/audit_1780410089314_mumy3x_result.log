@@ -1,0 +1,45 @@
+[2026-06-02T14:22:22.101Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "```json\n{\n  \"vulnerabilities\": [\n    {\n      \"severity\": \"high\",\n      \"file\": \"core/engine/game_engine.py\",\n      \"line\": 83,\n      \"description\": \"Missing authentication/authorization check on get_visible_state(). Function returns player data without verifying the caller's identity. If exposed via API endpoint without auth middleware, any user can access any role's game state.\"\n    },\n    {\n      \"severity\": \"medium\",\n      \"file\": \"infra/ansible/deploy.yml\",\n      \"line\": 68,\n      \"description\": \"Potential variable scoping issue: post_tasks section references 'current_variant' from the loop. This will only work if Ansible's loop context persists (it does), but is fragile. Consider storing variant list explicitly.\"\n    },\n    {\n      \"severity\": \"medium\",\n      \"file\": \"infra/ansible/tasks/deploy_variant.yml\",\n      \"line\": 23,\n      \"description\": \"Environment file (containing secrets) uses mode 0600, which is correct. However, verify that ansible.builtin.template doesn't log variable values elsewhere. No_log directive only covers this single task.\"\n    }\n  ],\n  \"riskScore\": 35,\n  \"recommendations\": [\n    \"Add authentication middleware to all FastAPI endpoints that call game_engine functions. Verify caller identity before returning player state.\",\n    \"Implement role-based access control (RBAC) to restrict which roles can view which game states.\",\n    \"Check if there are any publicly exposed API endpoints. If yes, ensure all have proper authentication and input validation.\",\n    \"Audit all Ansible tasks for no_log coverage. Use 'no_log: true' globally for any task handling environment variables or secrets.\",\n    \"Add rate limiting on game API endpoints to prevent brute force or DoS attacks.\",\n    \"Run `pip-audit` or similar on dependencies to check for known CVEs in: fastapi, uvicorn, asyncpg, redis.\",\n    \"No hardcoded secrets found (good). Verify KEEPASS_MASTER_PASSWORD is not logged in CI output.\",\n    \"Consider adding request signing or HMAC validation for multiplayer game state sync to prevent tampering.\"\n  ]\n}\n```\n\nRisk low overall. No hardcoded secrets, modern dependencies, secrets management via vault is solid. Main gap: **game engine functions lack auth checks**—if API layer enforces auth, risk drops to low.\n\nFrontend not scanned (no TypeScript files in context). If frontend exists, check for XSS in template rendering and API response handling.\n",
+  "parsedOutput": {
+    "vulnerabilities": [
+      {
+        "severity": "high",
+        "file": "core/engine/game_engine.py",
+        "line": 83,
+        "description": "Missing authentication/authorization check on get_visible_state(). Function returns player data without verifying the caller's identity. If exposed via API endpoint without auth middleware, any user can access any role's game state."
+      },
+      {
+        "severity": "medium",
+        "file": "infra/ansible/deploy.yml",
+        "line": 68,
+        "description": "Potential variable scoping issue: post_tasks section references 'current_variant' from the loop. This will only work if Ansible's loop context persists (it does), but is fragile. Consider storing variant list explicitly."
+      },
+      {
+        "severity": "medium",
+        "file": "infra/ansible/tasks/deploy_variant.yml",
+        "line": 23,
+        "description": "Environment file (containing secrets) uses mode 0600, which is correct. However, verify that ansible.builtin.template doesn't log variable values elsewhere. No_log directive only covers this single task."
+      }
+    ],
+    "riskScore": 35,
+    "recommendations": [
+      "Add authentication middleware to all FastAPI endpoints that call game_engine functions. Verify caller identity before returning player state.",
+      "Implement role-based access control (RBAC) to restrict which roles can view which game states.",
+      "Check if there are any publicly exposed API endpoints. If yes, ensure all have proper authentication and input validation.",
+      "Audit all Ansible tasks for no_log coverage. Use 'no_log: true' globally for any task handling environment variables or secrets.",
+      "Add rate limiting on game API endpoints to prevent brute force or DoS attacks.",
+      "Run `pip-audit` or similar on dependencies to check for known CVEs in: fastapi, uvicorn, asyncpg, redis.",
+      "No hardcoded secrets found (good). Verify KEEPASS_MASTER_PASSWORD is not logged in CI output.",
+      "Consider adding request signing or HMAC validation for multiplayer game state sync to prevent tampering."
+    ]
+  },
+  "durationMs": 52787,
+  "model": "haiku",
+  "sandboxMode": "strict",
+  "workerType": "audit",
+  "timestamp": "2026-06-02T14:22:22.101Z",
+  "executionId": "audit_1780410089314_mumy3x"
+}

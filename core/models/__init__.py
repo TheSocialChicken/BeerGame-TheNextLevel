@@ -1,6 +1,6 @@
-from .player import PlayerRole, ROLE_ORDER
-from .order import Order, IncomingShipment
 from .game import GameConfig, GamePhase, GameState, PlayerState
+from .order import IncomingShipment, Order
+from .player import ROLE_ORDER, PlayerRole
 
 __all__ = [
     "PlayerRole",

@@ -1,0 +1,23 @@
+[2026-06-02T18:16:40.500Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "Snippet provided is Coverage.py HTML report generator — auto-generated, not project source.\n\nNeed actual codebase to audit. Per git status + CLAUDE.md, scan should cover:\n- `core/` — Python backend (FastAPI, Pydantic models)\n- `frontend/` — SvelteKit TypeScript\n- `infra/` — Docker, Ansible, secrets handling\n- `variants/` — Game logic\n\nProvide path/files to analyze, or I scan the full tree. Which?\n\n```json\n{\n  \"status\": \"incomplete\",\n  \"reason\": \"snippet_is_generated_coverage_code_not_source\",\n  \"files_to_audit\": [\n    \"core/**/*.py\",\n    \"frontend/src/**/*.{ts,svelte}\",\n    \"infra/ansible/**/*.yml\",\n    \"variants/**/*.py\"\n  ],\n  \"next_step\": \"provide_target_files_or_authorize_full_scan\"\n}\n```\n",
+  "parsedOutput": {
+    "status": "incomplete",
+    "reason": "snippet_is_generated_coverage_code_not_source",
+    "files_to_audit": [
+      "core/**/*.py",
+      "frontend/src/**/*.{ts,svelte}",
+      "infra/ansible/**/*.yml",
+      "variants/**/*.py"
+    ],
+    "next_step": "provide_target_files_or_authorize_full_scan"
+  },
+  "durationMs": 13158,
+  "model": "haiku",
+  "sandboxMode": "strict",
+  "workerType": "audit",
+  "timestamp": "2026-06-02T18:16:40.500Z",
+  "executionId": "audit_1780424187342_pq40z5"
+}

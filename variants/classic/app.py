@@ -1,9 +1,11 @@
 from fastapi import FastAPI, HTTPException
-from core.engine.game_engine import GameEngine
-from core.models import PlayerRole
+
 from backend.api.games import router as games_router
 from backend.api.websocket import router as websocket_router
 from backend.services.game_store import game_store
+from core.engine.game_engine import GameEngine
+from core.models import PlayerRole
+
 from .config import get_classic_config
 
 app = FastAPI(title="Classic Beer Game", version="0.1.0")

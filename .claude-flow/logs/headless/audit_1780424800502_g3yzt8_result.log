@@ -1,0 +1,16 @@
+[2026-06-02T18:26:54.344Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "Provided context insufficient. Got only coverage.py HTML tool artifact (generated file, not app code).\n\nNeed actual app code for security audit:\n- **Python backend** — `core/`, `variants/*/app.py`, API endpoints, database queries\n- **TypeScript frontend** — `frontend/src/`, route handlers, API clients\n- **Infrastructure** — `docker-compose.yml`, Ansible playbooks, `.env` templates\n- **Dependencies** — `requirements.txt`, `uv.lock`, `package.json`, `package-lock.json`\n\nCoverage HTML file itself: low risk (generated artifact, only in repo for dev visibility; `.gitignore` should hide it in production).\n\nProvide actual source files or full directory tree, and I'll analyze for:\n- Hardcoded secrets / env handling\n- SQL injection in ORM/queries\n- XSS in template rendering (Svelte, Quarto reports)\n- Dependency vulnerabilities (`pip-audit`, `npm audit`)\n- Auth/authz gaps in FastAPI routes + WebSocket handlers\n- Secrets in logs / error responses\n\nWhich files should I scan?\n",
+  "parsedOutput": {
+    "parseError": true,
+    "rawOutput": "Provided context insufficient. Got only coverage.py HTML tool artifact (generated file, not app code).\n\nNeed actual app code for security audit:\n- **Python backend** — `core/`, `variants/*/app.py`, API endpoints, database queries\n- **TypeScript frontend** — `frontend/src/`, route handlers, API clients\n- **Infrastructure** — `docker-compose.yml`, Ansible playbooks, `.env` templates\n- **Dependencies** — `requirements.txt`, `uv.lock`, `package.json`, `package-lock.json`\n\nCoverage HTML file itself: low risk (generated artifact, only in repo for dev visibility; `.gitignore` should hide it in production).\n\nProvide actual source files or full directory tree, and I'll analyze for:\n- Hardcoded secrets / env handling\n- SQL injection in ORM/queries\n- XSS in template rendering (Svelte, Quarto reports)\n- Dependency vulnerabilities (`pip-audit`, `npm audit`)\n- Auth/authz gaps in FastAPI routes + WebSocket handlers\n- Secrets in logs / error responses\n\nWhich files should I scan?\n"
+  },
+  "durationMs": 13842,
+  "model": "haiku",
+  "sandboxMode": "strict",
+  "workerType": "audit",
+  "timestamp": "2026-06-02T18:26:54.344Z",
+  "executionId": "audit_1780424800502_g3yzt8"
+}

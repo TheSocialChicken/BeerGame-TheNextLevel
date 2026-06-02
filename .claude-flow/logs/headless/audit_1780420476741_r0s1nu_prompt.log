@@ -1,0 +1,159 @@
+[2026-06-02T17:14:36.817Z] PROMPT
+============================================================
+Analyze this codebase for security vulnerabilities:
+- Check for hardcoded secrets (API keys, passwords)
+- Identify SQL injection risks
+- Find XSS vulnerabilities
+- Check for insecure dependencies
+- Identify authentication/authorization issues
+
+Provide a JSON report with:
+{
+  "vulnerabilities": [{ "severity": "high|medium|low", "file": "...", "line": N, "description": "..." }],
+  "riskScore": 0-100,
+  "recommendations": ["..."]
+}
+
+## Codebase Context
+
+--- htmlcov/coverage_html_cb_dd2e7eb5.js (truncated) ---
+// Licensed under the Apache License: http://www.apache.org/licenses/LICENSE-2.0
+// For details: https://github.com/coveragepy/coveragepy/blob/main/NOTICE.txt
+
+// Coverage.py HTML report browser code.
+/*jslint browser: true, sloppy: true, vars: true, plusplus: true, maxerr: 50, indent: 4 */
+/*global coverage: true, document, window, $ */
+
+coverage = {};
+
+// General helpers
+function debounce(callback, wait) {
+    let timeoutId = null;
+    return function(...args) {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+            callback.apply(this, args);
+        }, wait);
+    };
+};
+
+function checkVisible(element) {
+    const rect = element.getBoundingClientRect();
+    const viewBottom = Math.max(document.documentElement.clientHeight, window.innerHeight);
+    const viewTop = 30;
+    return !(rect.bottom < viewTop || rect.top >= viewBottom);
+}
+
+function on_click(sel, fn) {
+    const elt = document.querySelector(sel);
+    if (elt) {
+        elt.addEventListener("click", fn);
+    }
+}
+
+// Helpers for table sorting
+function getCellValue(row, column = 0) {
+    const cell = row.cells[column]  // nosemgrep: eslint.detect-object-injection
+    if (cell.childElementCount == 1) {
+        var child = cell.firstElementChild;
+        if (child.tagName === "A") {
+            child = child.firstElementChild;
+        }
+        if (child instanceof HTMLDataElement && child.value) {
+            return child.value;
+        }
+    }
+    return cell.innerText || cell.textContent;
+}
+
+function rowComparator(rowA, rowB, column = 0) {
+    let valueA = getCellValue(rowA, column);
+    let valueB = getCellValue(rowB, column);
+    if (!isNaN(valueA) && !isNaN(valueB)) {
+        return valueA - valueB;
+    }
+    return valueA.localeCompare(valueB, undefined, {numeric: true});
+}
+
+function sortColumn(th) {
+    // Get the current sorting direction of the selected header,
+    // clear state on other headers and then set the new sorting direction.
+    const currentSortOrder = th.getAttribute("aria-sort");
+    [...th.parentElement.cells].forEach(header => header.setAttribute("aria-sort", "none"));
+    var direction;
+    if (currentSortOrder === "none") {
+        direction = th.dataset.defaultSortOrder || "ascending";
+    }
+    else if (currentSortOrder === "ascending") {
+        direction = "descending";
+    }
+    else {
+        direction = "ascending";
+    }
+    th.setAttribute("aria-sort", direction);
+
+    const column = [...th.parentElement.cells].indexOf(th)
+
+    // Sort all rows and afterwards append them in order to move them in the DOM.
+    Array.from(th.closest("table").querySelectorAll("tbody tr"))
+        .sort((rowA, rowB) => rowComparator(rowA, rowB, column) * (direction === "ascending" ? 1 : -1))
+        .forEach(tr => tr.parentElement.appendChild(tr));
+
+    // Save the sort order for next time.
+    if (th.id !== "region") {
+        let th_id = "file";  // Sort by file if we don't have a column id
+        let current_direction = direction;
+        const stored_list = localStorage.getItem(coverage.INDEX_SORT_STORAGE);
+        if (stored_list) {
+            ({th_id, direction} = JSON.parse(stored_list))
+        }
+        localStorage.setItem(coverage.INDEX_SORT_STORAGE, JSON.stringify({
+            "th_id": th.id,
+            "direction": current_direction
+        }));
+        if (th.id !== th_id || document.getElementById("region")) {
+            // Sort column has changed, unset sorting by function or class.
+            localStorage.setItem(coverage.SORTED_BY_REGION, JSON.stringify({
+                "by_region": false,
+                "region_direction": current_direction
+            }));
+        }
+    }
+    else {
+        // Sort column has changed to by function or class, remember that.
+        localStorage.setItem(coverage.SORTED_BY_REGION, JSON.stringify({
+            "by_region": true,
+            "region_direction": direction
+        }));
+    }
+}
+
+// Find all the elements with data-shortcut attribute, and use them to assign a shortcut key.
+coverage.assign_shortkeys = function () {
+    document.querySelectorAll("[data-shortcut]").forEach(element => {
+        document.addEventListener("keypress", event => {
+            if (event.target.tagName.toLowerCase() === "input") {
+                return; // ignore keypress from search filter
+            }
+            if (event.key === element.dataset.shortcut) {
+                element.click();
+            }
+        });
+    });
+};
+
+// Create the events for the filter box.
+coverage.wire_up_filter = function () {
+    // Populate the filter and hide100 inputs if there are saved values for them.
+    const saved_filter_value = localStorage.getItem(coverage.FILTER_STORAGE);
+    if (saved_filter_value) {
+        document.getElementById("filter").value = saved_filter_value;
+    }
+    const saved_hide100_value = localStorage.getItem(coverage.HIDE100_STORAGE);
+    if (saved_hide100_value) {
+        document.getElementById("hide100").checked = JSON.parse(saved_hide100_value);
+   
+
+## Instructions
+
+Analyze the above codebase context and provide your response following the format specified in the task.

@@ -1,0 +1,16 @@
+[2026-06-02T13:08:14.297Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "File provided is auto-generated coverage report JS. Not actual application code. Can't audit from this.\n\nNeed to scan:\n- `core/` — Python models, game engine, AI players\n- `variants/` — variant implementations\n- `frontend/src/` — SvelteKit routes, components\n- `.env` files, config, secrets management\n- Dependencies (`pyproject.toml`, `package.json`)\n\nOffer: Scan repo properly. Takes ~5 min to grep for hardcoded secrets, SQL queries, auth checks, dependency audit. Want me to do full pass?\n\nOr if you have specific files worried about, share those.\n",
+  "parsedOutput": {
+    "parseError": true,
+    "rawOutput": "File provided is auto-generated coverage report JS. Not actual application code. Can't audit from this.\n\nNeed to scan:\n- `core/` — Python models, game engine, AI players\n- `variants/` — variant implementations\n- `frontend/src/` — SvelteKit routes, components\n- `.env` files, config, secrets management\n- Dependencies (`pyproject.toml`, `package.json`)\n\nOffer: Scan repo properly. Takes ~5 min to grep for hardcoded secrets, SQL queries, auth checks, dependency audit. Want me to do full pass?\n\nOr if you have specific files worried about, share those.\n"
+  },
+  "durationMs": 10639,
+  "model": "haiku",
+  "sandboxMode": "strict",
+  "workerType": "audit",
+  "timestamp": "2026-06-02T13:08:14.297Z",
+  "executionId": "audit_1780405683658_ror6xv"
+}

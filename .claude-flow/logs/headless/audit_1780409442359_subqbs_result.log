@@ -1,0 +1,38 @@
+[2026-06-02T14:11:29.307Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "Scan complete. Analyzed core engine (models, game logic, AI players). Generated security report:\n\n```json\n{\n  \"vulnerabilities\": [\n    {\n      \"severity\": \"low\",\n      \"file\": \"core/engine/order_processor.py\",\n      \"line\": 87,\n      \"description\": \"Float precision accumulation in cumulative_cost. Over many rounds with fractional costs, IEEE 754 floating-point arithmetic may lose precision. Not a security vulnerability but potential data integrity issue in long games.\"\n    },\n    {\n      \"severity\": \"low\",\n      \"file\": \"core/engine/game_engine.py\",\n      \"line\": 83,\n      \"description\": \"get_visible_state exposes game_id without access control validation. Should verify requester's role matches before returning state. Currently relies on API layer for auth (not visible in provided code).\"\n    }\n  ],\n  \"riskScore\": 15,\n  \"recommendations\": [\n    \"Use Decimal instead of float for cost calculations to preserve precision across game rounds\",\n    \"Add role-based access control check in get_visible_state() before returning state\",\n    \"Validate game_id format is valid UUID before accepting it (defensive coding)\",\n    \"Ensure FastAPI endpoints validate WebSocket auth tokens before accepting player state queries\",\n    \"Review API layer (not provided) for input validation on order quantities from client\",\n    \"Add request rate limiting to prevent order spam attacks\",\n    \"Use HTTPS/WSS exclusively in production deployment\"\n  ]\n}\n```\n\n**Summary:** Core engine code is secure — strong Pydantic validation, no hardcoded secrets, no SQL/command injection vectors. Float precision accumulation is only operational risk. Security depends heavily on API/auth layer not analyzed here. See CLAUDE.md for FastAPI endpoints to audit.\n",
+  "parsedOutput": {
+    "vulnerabilities": [
+      {
+        "severity": "low",
+        "file": "core/engine/order_processor.py",
+        "line": 87,
+        "description": "Float precision accumulation in cumulative_cost. Over many rounds with fractional costs, IEEE 754 floating-point arithmetic may lose precision. Not a security vulnerability but potential data integrity issue in long games."
+      },
+      {
+        "severity": "low",
+        "file": "core/engine/game_engine.py",
+        "line": 83,
+        "description": "get_visible_state exposes game_id without access control validation. Should verify requester's role matches before returning state. Currently relies on API layer for auth (not visible in provided code)."
+      }
+    ],
+    "riskScore": 15,
+    "recommendations": [
+      "Use Decimal instead of float for cost calculations to preserve precision across game rounds",
+      "Add role-based access control check in get_visible_state() before returning state",
+      "Validate game_id format is valid UUID before accepting it (defensive coding)",
+      "Ensure FastAPI endpoints validate WebSocket auth tokens before accepting player state queries",
+      "Review API layer (not provided) for input validation on order quantities from client",
+      "Add request rate limiting to prevent order spam attacks",
+      "Use HTTPS/WSS exclusively in production deployment"
+    ]
+  },
+  "durationMs": 46948,
+  "model": "haiku",
+  "sandboxMode": "strict",
+  "workerType": "audit",
+  "timestamp": "2026-06-02T14:11:29.307Z",
+  "executionId": "audit_1780409442359_subqbs"
+}

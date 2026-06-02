@@ -1,0 +1,140 @@
+[2026-06-02T11:19:48.715Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "Good picture. Here's the full analysis:\n\n---\n\n## Performance Analysis — BeerGame Core Engine\n\nNo frontend exists yet, so React/UI findings are N/A. Analysis covers the Python engine.\n\n---\n\n### 1. Memory Leak — `incoming_orders` Never Drained\n\n**File:** `core/models/game.py:36`, `core/engine/order_processor.py:72`\n\n`PlayerState.incoming_orders` is appended every round but **never read or cleared** anywhere in the engine. After 26 rounds each player holds 26 dead entries.\n\n```python\n# order_processor.py:72 — appends every round\nupstream_ps.incoming_orders.append(order_qty)\n\n# Nothing ever reads or clears this list\n```\n\n**Fix:** Either use it (pass as demand source) or replace with a single `int` field:\n\n```python\n# In PlayerState:\npending_order: int = 0  # replaces incoming_orders: list[int]\n\n# In place_orders():\nupstream_ps.pending_order = order_qty  # overwrite, not append\n```\n\n---\n\n### 2. Redundant Double-Pass in `advance_shipments`\n\n**File:** `core/engine/order_processor.py:7-13`\n\nTwo iterations over `incoming_shipments` per player per round:\n\n```python\n# Pass 1: sum arrived\narrived = sum(s.quantity for s in ps.incoming_shipments if s.arrives_in_rounds == 1)\n# Pass 2: rebuild list with decremented timers\nps.incoming_shipments = [\n    IncomingShipment(quantity=s.quantity, arrives_in_rounds=s.arrives_in_rounds - 1)\n    for s in ps.incoming_shipments\n    if s.arrives_in_rounds > 1\n]\n```\n\nOne pass, no redundancy:\n\n```python\narrived = 0\nremaining = []\nfor s in ps.incoming_shipments:\n    if s.arrives_in_rounds == 1:\n        arrived += s.quantity\n    else:\n        remaining.append(\n            IncomingShipment(quantity=s.quantity, arrives_in_rounds=s.arrives_in_rounds - 1)\n        )\nps.inventory += arrived\nps.incoming_shipments = remaining\n```\n\n---\n\n### 3. Pydantic Object Churn in Hot Loop\n\n**File:** `core/engine/order_processor.py:9-13`\n\nEvery tick, for every in-transit shipment, a new `IncomingShipment` Pydantic model is constructed (triggers full validation). With `shipping_delay=2` and 4 players, that's ~8–16 Pydantic objects created and discarded per round.\n\n**Fix:** Use `model_construct()` to skip validation on internal objects (values already validated on entry):\n\n```python\nIncomingShipment.model_construct(quantity=s.quantity, arrives_in_rounds=s.arrives_in_rounds - 1)\n```\n\nSame applies in `fulfill_orders` (line 46) and `place_orders` (line 75).\n\n---\n\n### 4. Repeated Set Build in `is_round_complete`\n\n**File:** `core/models/game.py:56-57`\n\n```python\ndef is_round_complete(self) -> bool:\n    active_roles = {role for role, ps in self.players.items() if not ps.is_ai}\n    return active_roles.issubset(self.orders_this_round.keys())\n```\n\nSet rebuilt every call. Called potentially after every `submit_order`. With only 4 players this is negligible now, but when this hits a WebSocket hot path it adds up. Cache the active roles set at game creation (it never changes mid-game):\n\n```python\n# In GameState, add:\nactive_roles: frozenset[PlayerRole] = Field(default_factory=frozenset)\n\n# Set once in GameEngine.start_game():\nstate.active_roles = frozenset(r for r, ps in state.players.items() if not ps.is_ai)\n\n# Then:\ndef is_round_complete(self) -> bool:\n    return self.active_roles.issubset(self.orders_this_round.keys())\n```\n\n---\n\n### 5. Duplicated Cost Formula\n\n**File:** `core/models/game.py:42` vs `core/engine/order_processor.py:87-90`\n\n`PlayerState.round_cost()` and `accrue_costs()` implement the same formula independently. If costs change, one will drift.\n\n```python\n# accrue_costs should delegate:\ndef accrue_costs(state: GameState) -> GameState:\n    for ps in state.players.values():\n        ps.cumulative_cost += ps.round_cost()\n    return state\n```\n\n---\n\n### 6. Future DB Caching (Pre-emptive)\n\nWhen PostgreSQL lands, these will be N+1 hot spots:\n\n- **`get_visible_state`** called per WebSocket message per player — will query player rows individually. Add a `SELECT ... WHERE game_id = $1` join fetching all players at once.\n- **`total_cost()`** (`game.py:59`) — when persisted, don't recompute from all player rows; maintain a `games.total_cost` column updated on each `accrue_costs` call.\n- **Game state serialization** — `s.model_dump()` in `get_visible_state:95` per shipment per WebSocket tick. Redis-cache the visible state per role, invalidate only on `process_round`.\n\n---\n\n### Priority\n\n| Issue | Impact | Effort |\n|-------|--------|--------|\n| `incoming_orders` memory leak | Medium (grows unbounded) | Low |\n| Double-pass in `advance_shipments` | Low-Medium | Low |\n| Pydantic churn in hot loop | Low (small game) | Low |\n| `is_round_complete` set rebuild | Low now, High at scale | Low |\n| Duplicated cost formula | Correctness risk | Trivial |\n\nMost impactful fix right now: kill the `incoming_orders` leak. Rest are micro-optimizations that matter once WebSocket load hits.\n",
+  "parsedOutput": {
+    "sections": [
+      {
+        "title": "Performance Analysis — BeerGame Core Engine",
+        "content": "\nNo frontend exists yet, so React/UI findings are N/A. Analysis covers the Python engine.\n\n---\n\n",
+        "level": 2
+      },
+      {
+        "title": "1. Memory Leak — `incoming_orders` Never Drained",
+        "content": "\n**File:** `core/models/game.py:36`, `core/engine/order_processor.py:72`\n\n`PlayerState.incoming_orders` is appended every round but **never read or cleared** anywhere in the engine. After 26 rounds each player holds 26 dead entries.\n\n```python\n",
+        "level": 3
+      },
+      {
+        "title": "order_processor.py:72 — appends every round",
+        "content": "upstream_ps.incoming_orders.append(order_qty)\n\n",
+        "level": 1
+      },
+      {
+        "title": "Nothing ever reads or clears this list",
+        "content": "```\n\n**Fix:** Either use it (pass as demand source) or replace with a single `int` field:\n\n```python\n",
+        "level": 1
+      },
+      {
+        "title": "In PlayerState:",
+        "content": "pending_order: int = 0  # replaces incoming_orders: list[int]\n\n",
+        "level": 1
+      },
+      {
+        "title": "In place_orders():",
+        "content": "upstream_ps.pending_order = order_qty  # overwrite, not append\n```\n\n---\n\n",
+        "level": 1
+      },
+      {
+        "title": "2. Redundant Double-Pass in `advance_shipments`",
+        "content": "\n**File:** `core/engine/order_processor.py:7-13`\n\nTwo iterations over `incoming_shipments` per player per round:\n\n```python\n",
+        "level": 3
+      },
+      {
+        "title": "Pass 1: sum arrived",
+        "content": "arrived = sum(s.quantity for s in ps.incoming_shipments if s.arrives_in_rounds == 1)\n",
+        "level": 1
+      },
+      {
+        "title": "Pass 2: rebuild list with decremented timers",
+        "content": "ps.incoming_shipments = [\n    IncomingShipment(quantity=s.quantity, arrives_in_rounds=s.arrives_in_rounds - 1)\n    for s in ps.incoming_shipments\n    if s.arrives_in_rounds > 1\n]\n```\n\nOne pass, no redundancy:\n\n```python\narrived = 0\nremaining = []\nfor s in ps.incoming_shipments:\n    if s.arrives_in_rounds == 1:\n        arrived += s.quantity\n    else:\n        remaining.append(\n            IncomingShipment(quantity=s.quantity, arrives_in_rounds=s.arrives_in_rounds - 1)\n        )\nps.inventory += arrived\nps.incoming_shipments = remaining\n```\n\n---\n\n",
+        "level": 1
+      },
+      {
+        "title": "3. Pydantic Object Churn in Hot Loop",
+        "content": "\n**File:** `core/engine/order_processor.py:9-13`\n\nEvery tick, for every in-transit shipment, a new `IncomingShipment` Pydantic model is constructed (triggers full validation). With `shipping_delay=2` and 4 players, that's ~8–16 Pydantic objects created and discarded per round.\n\n**Fix:** Use `model_construct()` to skip validation on internal objects (values already validated on entry):\n\n```python\nIncomingShipment.model_construct(quantity=s.quantity, arrives_in_rounds=s.arrives_in_rounds - 1)\n```\n\nSame applies in `fulfill_orders` (line 46) and `place_orders` (line 75).\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "4. Repeated Set Build in `is_round_complete`",
+        "content": "\n**File:** `core/models/game.py:56-57`\n\n```python\ndef is_round_complete(self) -> bool:\n    active_roles = {role for role, ps in self.players.items() if not ps.is_ai}\n    return active_roles.issubset(self.orders_this_round.keys())\n```\n\nSet rebuilt every call. Called potentially after every `submit_order`. With only 4 players this is negligible now, but when this hits a WebSocket hot path it adds up. Cache the active roles set at game creation (it never changes mid-game):\n\n```python\n",
+        "level": 3
+      },
+      {
+        "title": "In GameState, add:",
+        "content": "active_roles: frozenset[PlayerRole] = Field(default_factory=frozenset)\n\n",
+        "level": 1
+      },
+      {
+        "title": "Set once in GameEngine.start_game():",
+        "content": "state.active_roles = frozenset(r for r, ps in state.players.items() if not ps.is_ai)\n\n",
+        "level": 1
+      },
+      {
+        "title": "Then:",
+        "content": "def is_round_complete(self) -> bool:\n    return self.active_roles.issubset(self.orders_this_round.keys())\n```\n\n---\n\n",
+        "level": 1
+      },
+      {
+        "title": "5. Duplicated Cost Formula",
+        "content": "\n**File:** `core/models/game.py:42` vs `core/engine/order_processor.py:87-90`\n\n`PlayerState.round_cost()` and `accrue_costs()` implement the same formula independently. If costs change, one will drift.\n\n```python\n",
+        "level": 3
+      },
+      {
+        "title": "accrue_costs should delegate:",
+        "content": "def accrue_costs(state: GameState) -> GameState:\n    for ps in state.players.values():\n        ps.cumulative_cost += ps.round_cost()\n    return state\n```\n\n---\n\n",
+        "level": 1
+      },
+      {
+        "title": "6. Future DB Caching (Pre-emptive)",
+        "content": "\nWhen PostgreSQL lands, these will be N+1 hot spots:\n\n- **`get_visible_state`** called per WebSocket message per player — will query player rows individually. Add a `SELECT ... WHERE game_id = $1` join fetching all players at once.\n- **`total_cost()`** (`game.py:59`) — when persisted, don't recompute from all player rows; maintain a `games.total_cost` column updated on each `accrue_costs` call.\n- **Game state serialization** — `s.model_dump()` in `get_visible_state:95` per shipment per WebSocket tick. Redis-cache the visible state per role, invalidate only on `process_round`.\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "Priority",
+        "content": "| Issue | Impact | Effort |\n|-------|--------|--------|\n| `incoming_orders` memory leak | Medium (grows unbounded) | Low |\n| Double-pass in `advance_shipments` | Low-Medium | Low |\n| Pydantic churn in hot loop | Low (small game) | Low |\n| `is_round_complete` set rebuild | Low now, High at scale | Low |\n| Duplicated cost formula | Correctness risk | Trivial |\n\nMost impactful fix right now: kill the `incoming_orders` leak. Rest are micro-optimizations that matter once WebSocket load hits.",
+        "level": 3
+      }
+    ],
+    "codeBlocks": [
+      {
+        "language": "python",
+        "code": "# order_processor.py:72 — appends every round\nupstream_ps.incoming_orders.append(order_qty)\n\n# Nothing ever reads or clears this list"
+      },
+      {
+        "language": "python",
+        "code": "# In PlayerState:\npending_order: int = 0  # replaces incoming_orders: list[int]\n\n# In place_orders():\nupstream_ps.pending_order = order_qty  # overwrite, not append"
+      },
+      {
+        "language": "python",
+        "code": "# Pass 1: sum arrived\narrived = sum(s.quantity for s in ps.incoming_shipments if s.arrives_in_rounds == 1)\n# Pass 2: rebuild list with decremented timers\nps.incoming_shipments = [\n    IncomingShipment(quantity=s.quantity, arrives_in_rounds=s.arrives_in_rounds - 1)\n    for s in ps.incoming_shipments\n    if s.arrives_in_rounds > 1\n]"
+      },
+      {
+        "language": "python",
+        "code": "arrived = 0\nremaining = []\nfor s in ps.incoming_shipments:\n    if s.arrives_in_rounds == 1:\n        arrived += s.quantity\n    else:\n        remaining.append(\n            IncomingShipment(quantity=s.quantity, arrives_in_rounds=s.arrives_in_rounds - 1)\n        )\nps.inventory += arrived\nps.incoming_shipments = remaining"
+      },
+      {
+        "language": "python",
+        "code": "IncomingShipment.model_construct(quantity=s.quantity, arrives_in_rounds=s.arrives_in_rounds - 1)"
+      },
+      {
+        "language": "python",
+        "code": "def is_round_complete(self) -> bool:\n    active_roles = {role for role, ps in self.players.items() if not ps.is_ai}\n    return active_roles.issubset(self.orders_this_round.keys())"
+      },
+      {
+        "language": "python",
+        "code": "# In GameState, add:\nactive_roles: frozenset[PlayerRole] = Field(default_factory=frozenset)\n\n# Set once in GameEngine.start_game():\nstate.active_roles = frozenset(r for r, ps in state.players.items() if not ps.is_ai)\n\n# Then:\ndef is_round_complete(self) -> bool:\n    return self.active_roles.issubset(self.orders_this_round.keys())"
+      },
+      {
+        "language": "python",
+        "code": "# accrue_costs should delegate:\ndef accrue_costs(state: GameState) -> GameState:\n    for ps in state.players.values():\n        ps.cumulative_cost += ps.round_cost()\n    return state"
+      }
+    ]
+  },
+  "durationMs": 62314,
+  "model": "sonnet",
+  "sandboxMode": "permissive",
+  "workerType": "optimize",
+  "timestamp": "2026-06-02T11:19:48.715Z",
+  "executionId": "optimize_1780399126401_bfkeo9"
+}

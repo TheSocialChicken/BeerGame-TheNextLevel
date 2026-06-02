@@ -1,0 +1,26 @@
+[2026-06-02T13:50:26.084Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "```json\n{\n  \"vulnerabilities\": [],\n  \"riskScore\": 5,\n  \"recommendations\": [\n    \"No hardcoded secrets found. Maintain practice: use environment variables + KeePass vault for all credentials\",\n    \"No SQL/database code present yet. When added, use parameterized queries (asyncpg handles this safely)\",\n    \"No WebSocket/API handlers found. When building FastAPI routes: validate all input via Pydantic (already in use), avoid string interpolation in queries\",\n    \"Pydantic models use Field validators (ge=0, etc.) — good. Extend to all user-facing inputs when API is built\",\n    \"Dependencies are recent (FastAPI 0.115+, Pydantic 2.9+). Run `pip-audit` in CI to catch vulns: add to pyproject.toml dev deps\",\n    \"Cost arithmetic uses floats. Add test for rounding errors before shipping reports (Quarto output)\",\n    \"AI player inputs (GameState) are trusted — fine for now. Add role-based access control if multi-tenant later\",\n    \"uv + Pydantic + async stdlib give solid foundation. No eval/pickle/yaml.load calls detected\"\n  ]\n}\n```\n\n**Codebase is early (Sprint 1). Core engine code — clean. No secrets, no SQL, no routes. Keep security practices above as scale grows.**\n",
+  "parsedOutput": {
+    "vulnerabilities": [],
+    "riskScore": 5,
+    "recommendations": [
+      "No hardcoded secrets found. Maintain practice: use environment variables + KeePass vault for all credentials",
+      "No SQL/database code present yet. When added, use parameterized queries (asyncpg handles this safely)",
+      "No WebSocket/API handlers found. When building FastAPI routes: validate all input via Pydantic (already in use), avoid string interpolation in queries",
+      "Pydantic models use Field validators (ge=0, etc.) — good. Extend to all user-facing inputs when API is built",
+      "Dependencies are recent (FastAPI 0.115+, Pydantic 2.9+). Run `pip-audit` in CI to catch vulns: add to pyproject.toml dev deps",
+      "Cost arithmetic uses floats. Add test for rounding errors before shipping reports (Quarto output)",
+      "AI player inputs (GameState) are trusted — fine for now. Add role-based access control if multi-tenant later",
+      "uv + Pydantic + async stdlib give solid foundation. No eval/pickle/yaml.load calls detected"
+    ]
+  },
+  "durationMs": 45738,
+  "model": "haiku",
+  "sandboxMode": "strict",
+  "workerType": "audit",
+  "timestamp": "2026-06-02T13:50:26.084Z",
+  "executionId": "audit_1780408180346_opwsdz"
+}

@@ -1,0 +1,65 @@
+[2026-06-02T11:54:09.218Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "Now I'll generate the security report based on my analysis.\n\n```json\n{\n  \"vulnerabilities\": [\n    {\n      \"severity\": \"medium\",\n      \"file\": \".github/workflows/deploy.yml\",\n      \"line\": 81,\n      \"description\": \"KEEPASS_MASTER_PASSWORD exposed as environment variable in workflow. Secrets should use encrypted masking; consider using GitHub Actions secrets masking or encrypted vault instead of plaintext env var exposure\"\n    },\n    {\n      \"severity\": \"medium\",\n      \"file\": \".github/workflows/deploy.yml\",\n      \"line\": 81,\n      \"description\": \"ANSIBLE_HOST_KEY_CHECKING disabled ('false'). This disables SSH host key verification, creating MITM vulnerability. Enable strict key checking in production\"\n    },\n    {\n      \"severity\": \"low\",\n      \"file\": \"infra/ansible/deploy.yml\",\n      \"line\": 51,\n      \"description\": \"git repo cloned without specifying SSH key or authentication method explicitly. Repository is public but should use SSH with deploy key for integrity\"\n    },\n    {\n      \"severity\": \"low\",\n      \"file\": \".github/workflows/ci.yml\",\n      \"line\": 130,\n      \"description\": \"ansible-lint errors ignored with 'continue-on-error: true'. Security misconfigurations in playbooks may not be caught during CI. Set to false or fix issues before proceeding\"\n    },\n    {\n      \"severity\": \"low\",\n      \"file\": \"core/models/game.py\",\n      \"line\": 19,\n      \"description\": \"No input validation on GameConfig.num_rounds upper bound. Max 100 rounds — can be DoS vector if processing cost is high. Consider lower limit or rate limiting\"\n    },\n    {\n      \"severity\": \"low\",\n      \"file\": \"core/engine/game_engine.py\",\n      \"line\": 56,\n      \"description\": \"Role validation uses name membership but no explicit authorization check. If user can submit orders for any role, escalation risk. Implement player-to-role mapping\"\n    }\n  ],\n  \"riskScore\": 28,\n  \"recommendations\": [\n    \"Enable SSH host key checking in deploy workflow (set ANSIBLE_HOST_KEY_CHECKING='true')\",\n    \"Use GitHub Secrets with automatic masking instead of env var for KEEPASS_MASTER_PASSWORD\",\n    \"Fix ansible-lint issues before deployment; set 'continue-on-error: false'\",\n    \"Add role-based access control: map authenticated users to roles, validate player owns role before order submission\",\n    \"Implement rate limiting on game creation and order submission to prevent resource exhaustion\",\n    \"Add request size limits to prevent billion-laughs / XML bomb attacks (when API is added)\",\n    \"Use structured logging with secrets redaction when WebSocket/API layer is added\",\n    \"Scan uv.lock for vulnerable dependencies; Dependabot is already configured but monitor for patch delays\",\n    \"No hardcoded credentials or SQL injection vectors found (core game logic uses Pydantic models only)\",\n    \"No XSS vectors identified in core (frontend not yet committed); validate input sanitization when SvelteKit code is added\"\n  ]\n}\n```\n\n## Summary\n\n**Risk profile:** Low to medium overall. Core game engine is safe (Pydantic-validated models, no SQL/exec/eval). Main risks are in deployment pipeline (SSH/secrets handling) and access control layer missing from game engine.\n\n**Key findings:**\n- No hardcoded secrets in code ✓\n- No SQL injection risks (no raw SQL) ✓  \n- No dangerous functions (eval, exec, pickle) ✓\n- Dependabot configured for updates ✓\n- **Issues:** SSH key checking disabled, secrets not properly masked, missing role-based access control, ansible-lint warnings ignored\n\nFix the deploy workflow (SSH + secrets masking) before production. Add auth layer when API is exposed.\n",
+  "parsedOutput": {
+    "vulnerabilities": [
+      {
+        "severity": "medium",
+        "file": ".github/workflows/deploy.yml",
+        "line": 81,
+        "description": "KEEPASS_MASTER_PASSWORD exposed as environment variable in workflow. Secrets should use encrypted masking; consider using GitHub Actions secrets masking or encrypted vault instead of plaintext env var exposure"
+      },
+      {
+        "severity": "medium",
+        "file": ".github/workflows/deploy.yml",
+        "line": 81,
+        "description": "ANSIBLE_HOST_KEY_CHECKING disabled ('false'). This disables SSH host key verification, creating MITM vulnerability. Enable strict key checking in production"
+      },
+      {
+        "severity": "low",
+        "file": "infra/ansible/deploy.yml",
+        "line": 51,
+        "description": "git repo cloned without specifying SSH key or authentication method explicitly. Repository is public but should use SSH with deploy key for integrity"
+      },
+      {
+        "severity": "low",
+        "file": ".github/workflows/ci.yml",
+        "line": 130,
+        "description": "ansible-lint errors ignored with 'continue-on-error: true'. Security misconfigurations in playbooks may not be caught during CI. Set to false or fix issues before proceeding"
+      },
+      {
+        "severity": "low",
+        "file": "core/models/game.py",
+        "line": 19,
+        "description": "No input validation on GameConfig.num_rounds upper bound. Max 100 rounds — can be DoS vector if processing cost is high. Consider lower limit or rate limiting"
+      },
+      {
+        "severity": "low",
+        "file": "core/engine/game_engine.py",
+        "line": 56,
+        "description": "Role validation uses name membership but no explicit authorization check. If user can submit orders for any role, escalation risk. Implement player-to-role mapping"
+      }
+    ],
+    "riskScore": 28,
+    "recommendations": [
+      "Enable SSH host key checking in deploy workflow (set ANSIBLE_HOST_KEY_CHECKING='true')",
+      "Use GitHub Secrets with automatic masking instead of env var for KEEPASS_MASTER_PASSWORD",
+      "Fix ansible-lint issues before deployment; set 'continue-on-error: false'",
+      "Add role-based access control: map authenticated users to roles, validate player owns role before order submission",
+      "Implement rate limiting on game creation and order submission to prevent resource exhaustion",
+      "Add request size limits to prevent billion-laughs / XML bomb attacks (when API is added)",
+      "Use structured logging with secrets redaction when WebSocket/API layer is added",
+      "Scan uv.lock for vulnerable dependencies; Dependabot is already configured but monitor for patch delays",
+      "No hardcoded credentials or SQL injection vectors found (core game logic uses Pydantic models only)",
+      "No XSS vectors identified in core (frontend not yet committed); validate input sanitization when SvelteKit code is added"
+    ]
+  },
+  "durationMs": 69054,
+  "model": "haiku",
+  "sandboxMode": "strict",
+  "workerType": "audit",
+  "timestamp": "2026-06-02T11:54:09.218Z",
+  "executionId": "audit_1780401180164_szzm56"
+}

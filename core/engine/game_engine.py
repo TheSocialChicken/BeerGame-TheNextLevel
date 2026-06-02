@@ -1,13 +1,15 @@
 import uuid
+
 from core.models import (
+    ROLE_ORDER,
     GameConfig,
     GamePhase,
     GameState,
     PlayerRole,
     PlayerState,
-    ROLE_ORDER,
 )
-from .order_processor import advance_shipments, fulfill_orders, place_orders, accrue_costs
+
+from .order_processor import accrue_costs, advance_shipments, fulfill_orders, place_orders
 
 
 class GameEngine:

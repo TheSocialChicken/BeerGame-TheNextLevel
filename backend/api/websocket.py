@@ -1,8 +1,9 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
-from core.models import PlayerRole
-from backend.services.game_store import game_store
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
 from backend.services.connection_manager import manager
+from backend.services.game_store import game_store
 from core.engine.game_engine import GameEngine
+from core.models import PlayerRole
 
 router = APIRouter(tags=["websocket"])
 engine = GameEngine()
@@ -49,7 +50,8 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, role: str):
                         from core.ai_players.rule_based import OrderUpToAI
                         for r, ps in state.players.items():
                             if ps.is_ai and r not in state.orders_this_round:
-                                state = engine.submit_order(state, r, OrderUpToAI(r).decide_order(state))
+                                ai_qty = OrderUpToAI(r).decide_order(state)
+                                state = engine.submit_order(state, r, ai_qty)
                         state = engine.process_round(state)
                         await game_store.save(state)
 

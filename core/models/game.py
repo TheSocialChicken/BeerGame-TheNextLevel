@@ -1,7 +1,9 @@
-from enum import Enum
+from enum import StrEnum
+
 from pydantic import BaseModel, Field
-from .player import PlayerRole
+
 from .order import IncomingShipment
+from .player import PlayerRole
 
 HOLDING_COST_PER_UNIT = 0.5  # per round
 BACKLOG_COST_PER_UNIT = 1.0  # per round
@@ -9,7 +11,7 @@ SHIPPING_DELAY = 2  # rounds in transit
 ORDER_DELAY = 2  # rounds for order to reach supplier
 
 
-class GamePhase(str, Enum):
+class GamePhase(StrEnum):
     WAITING = "waiting"
     ACTIVE = "active"
     FINISHED = "finished"

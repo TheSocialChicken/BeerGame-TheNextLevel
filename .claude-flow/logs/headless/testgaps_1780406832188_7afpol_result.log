@@ -1,0 +1,161 @@
+[2026-06-02T13:28:52.042Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "Solid baseline but ~40% scenario coverage. Key gaps below with skeletons.\n\n---\n\n## Coverage Gap Report\n\n### Priority 1 — High Severity\n\n#### 1. Backlog carryover mechanics (not isolated)\n```python\n# tests/core/test_order_processor.py\ndef test_backlog_carries_over_multiple_rounds():\n    \"\"\"Backlog from round 1 adds to round 2 demand.\"\"\"\n    players = {role: PlayerState(inventory=0, backlog=5, ...) for role in ROLE_ORDER}\n    orders = {role: 10 for role in ROLE_ORDER}\n    fulfill_orders(players, orders, customer_demand=10, config=default_config())\n    # backlog should accumulate, not reset\n    assert players[PlayerRole.RETAILER].backlog > 5\n```\n\n#### 2. Order delay vs shipping delay interaction\n```python\ndef test_order_delay_distinct_from_shipping_delay():\n    config = GameConfig(shipping_delay=2, order_delay=3)\n    engine = GameEngine()\n    state = engine.create_game(config=config)\n    state = engine.start_game(state)\n    # Run enough rounds to see both pipelines drain independently\n    for _ in range(6):\n        state = engine.process_round(state)\n    # factory shipment arrives after order_delay, not shipping_delay\n    assert state.players[PlayerRole.FACTORY].cumulative_cost > 0\n```\n\n#### 3. Mixed human/AI game (only all-AI tested)\n```python\ndef test_mixed_human_ai_game():\n    engine = GameEngine()\n    state = engine.create_game(ai_roles={PlayerRole.WHOLESALER, PlayerRole.DISTRIBUTOR})\n    state = engine.start_game(state)\n    # Humans must submit before round can process\n    assert not state.is_round_complete()\n    state = engine.submit_order(state, PlayerRole.RETAILER, 4)\n    state = engine.submit_order(state, PlayerRole.FACTORY, 4)\n    assert state.is_round_complete()\n    state = engine.process_round(state)\n    assert state.current_round == 1\n```\n\n---\n\n### Priority 2 — Medium Severity\n\n#### 4. Game boundary: num_rounds=1\n```python\ndef test_game_ends_after_one_round():\n    config = GameConfig(num_rounds=1)\n    engine = GameEngine()\n    state = engine.create_game(config=config, ai_roles=set(ROLE_ORDER))\n    state = engine.start_game(state)\n    state = engine.process_round(state)\n    assert state.phase == GamePhase.FINISHED\n```\n\n#### 5. process_round on FINISHED game\n```python\ndef test_process_round_on_finished_game_raises():\n    engine = GameEngine()\n    state = engine.create_game(config=GameConfig(num_rounds=1), ai_roles=set(ROLE_ORDER))\n    state = engine.start_game(state)\n    state = engine.process_round(state)\n    assert state.phase == GamePhase.FINISHED\n    with pytest.raises((ValueError, RuntimeError)):\n        engine.process_round(state)\n```\n\n#### 6. submit_order overwrites same role same round\n```python\ndef test_submit_order_overwrites_previous():\n    engine = GameEngine()\n    state = engine.create_game(ai_roles=set())\n    state = engine.start_game(state)\n    state = engine.submit_order(state, PlayerRole.RETAILER, 10)\n    state = engine.submit_order(state, PlayerRole.RETAILER, 99)  # overwrite\n    assert state.orders_this_round[PlayerRole.RETAILER] == 99\n```\n\n#### 7. Zero-demand round\n```python\ndef test_fulfill_orders_zero_demand():\n    players = make_default_players(inventory=20)\n    orders = {role: 4 for role in ROLE_ORDER}\n    fulfill_orders(players, orders, customer_demand=0, config=default_config())\n    assert players[PlayerRole.RETAILER].backlog == 0\n    assert players[PlayerRole.RETAILER].inventory == 20  # nothing consumed\n```\n\n#### 8. GameState with empty players dict\n```python\ndef test_game_state_empty_players():\n    state = GameState(players={}, current_round=0, ...)\n    assert state.total_cost() == 0\n    assert state.is_round_complete()  # vacuously true\n```\n\n---\n\n### Priority 3 — Medium / Low\n\n#### 9. Abstract class cannot be instantiated\n```python\ndef test_base_ai_player_is_abstract():\n    with pytest.raises(TypeError):\n        BaseAIPlayer()\n```\n\n#### 10. GameConfig boundary values\n```python\n@pytest.mark.parametrize(\"rounds\", [1, 50, 100])\ndef test_game_config_rounds_boundary(rounds):\n    cfg = GameConfig(num_rounds=rounds)\n    assert cfg.num_rounds == rounds\n\ndef test_game_config_empty_demand_pattern_raises():\n    with pytest.raises(ValidationError):\n        GameConfig(demand_pattern=[])\n```\n\n#### 11. advance_shipments with empty list\n```python\ndef test_advance_shipments_empty():\n    players = make_default_players()\n    for p in players.values():\n        p.incoming_shipments = []\n    advance_shipments(players)  # must not raise\n```\n\n#### 12. get_visible_state nonexistent role\n```python\ndef test_get_visible_state_invalid_role_raises():\n    engine = GameEngine()\n    state = engine.create_game()\n    state = engine.start_game(state)\n    with pytest.raises((KeyError, ValueError)):\n        engine.get_visible_state(state, \"nonexistent_role\")\n```\n\n---\n\n### Unimplemented Module\n\n`core/reporting/` — empty. No tests possible yet. When implemented, needs:\n- `test_report_generates_valid_html()`\n- `test_report_generates_valid_csv()`  \n- `test_report_handles_zero_round_game()`\n- `test_report_all_roles_present()`\n\n---\n\n### Summary\n\n| Severity | Count | Top gap |\n|----------|-------|---------|\n| High | 3 | Backlog isolation, delay interaction, mixed players |\n| Medium | 7 | Boundaries, overwrites, zero-demand, empty state |\n| Low | 4 | Abstract check, overflow, precision |\n| Unimplemented | 1 | Entire reporting module |\n\nCurrent coverage: good happy-path (~80% function), poor scenario (~40%). The three high-severity gaps can mask real supply-chain logic bugs.\n",
+  "parsedOutput": {
+    "sections": [
+      {
+        "title": "Coverage Gap Report",
+        "content": "\n",
+        "level": 2
+      },
+      {
+        "title": "Priority 1 — High Severity",
+        "content": "\n",
+        "level": 3
+      },
+      {
+        "title": "1. Backlog carryover mechanics (not isolated)",
+        "content": "```python\n",
+        "level": 4
+      },
+      {
+        "title": "tests/core/test_order_processor.py",
+        "content": "def test_backlog_carries_over_multiple_rounds():\n    \"\"\"Backlog from round 1 adds to round 2 demand.\"\"\"\n    players = {role: PlayerState(inventory=0, backlog=5, ...) for role in ROLE_ORDER}\n    orders = {role: 10 for role in ROLE_ORDER}\n    fulfill_orders(players, orders, customer_demand=10, config=default_config())\n    # backlog should accumulate, not reset\n    assert players[PlayerRole.RETAILER].backlog > 5\n```\n\n",
+        "level": 1
+      },
+      {
+        "title": "2. Order delay vs shipping delay interaction",
+        "content": "```python\ndef test_order_delay_distinct_from_shipping_delay():\n    config = GameConfig(shipping_delay=2, order_delay=3)\n    engine = GameEngine()\n    state = engine.create_game(config=config)\n    state = engine.start_game(state)\n    # Run enough rounds to see both pipelines drain independently\n    for _ in range(6):\n        state = engine.process_round(state)\n    # factory shipment arrives after order_delay, not shipping_delay\n    assert state.players[PlayerRole.FACTORY].cumulative_cost > 0\n```\n\n",
+        "level": 4
+      },
+      {
+        "title": "3. Mixed human/AI game (only all-AI tested)",
+        "content": "```python\ndef test_mixed_human_ai_game():\n    engine = GameEngine()\n    state = engine.create_game(ai_roles={PlayerRole.WHOLESALER, PlayerRole.DISTRIBUTOR})\n    state = engine.start_game(state)\n    # Humans must submit before round can process\n    assert not state.is_round_complete()\n    state = engine.submit_order(state, PlayerRole.RETAILER, 4)\n    state = engine.submit_order(state, PlayerRole.FACTORY, 4)\n    assert state.is_round_complete()\n    state = engine.process_round(state)\n    assert state.current_round == 1\n```\n\n---\n\n",
+        "level": 4
+      },
+      {
+        "title": "Priority 2 — Medium Severity",
+        "content": "\n",
+        "level": 3
+      },
+      {
+        "title": "4. Game boundary: num_rounds=1",
+        "content": "```python\ndef test_game_ends_after_one_round():\n    config = GameConfig(num_rounds=1)\n    engine = GameEngine()\n    state = engine.create_game(config=config, ai_roles=set(ROLE_ORDER))\n    state = engine.start_game(state)\n    state = engine.process_round(state)\n    assert state.phase == GamePhase.FINISHED\n```\n\n",
+        "level": 4
+      },
+      {
+        "title": "5. process_round on FINISHED game",
+        "content": "```python\ndef test_process_round_on_finished_game_raises():\n    engine = GameEngine()\n    state = engine.create_game(config=GameConfig(num_rounds=1), ai_roles=set(ROLE_ORDER))\n    state = engine.start_game(state)\n    state = engine.process_round(state)\n    assert state.phase == GamePhase.FINISHED\n    with pytest.raises((ValueError, RuntimeError)):\n        engine.process_round(state)\n```\n\n",
+        "level": 4
+      },
+      {
+        "title": "6. submit_order overwrites same role same round",
+        "content": "```python\ndef test_submit_order_overwrites_previous():\n    engine = GameEngine()\n    state = engine.create_game(ai_roles=set())\n    state = engine.start_game(state)\n    state = engine.submit_order(state, PlayerRole.RETAILER, 10)\n    state = engine.submit_order(state, PlayerRole.RETAILER, 99)  # overwrite\n    assert state.orders_this_round[PlayerRole.RETAILER] == 99\n```\n\n",
+        "level": 4
+      },
+      {
+        "title": "7. Zero-demand round",
+        "content": "```python\ndef test_fulfill_orders_zero_demand():\n    players = make_default_players(inventory=20)\n    orders = {role: 4 for role in ROLE_ORDER}\n    fulfill_orders(players, orders, customer_demand=0, config=default_config())\n    assert players[PlayerRole.RETAILER].backlog == 0\n    assert players[PlayerRole.RETAILER].inventory == 20  # nothing consumed\n```\n\n",
+        "level": 4
+      },
+      {
+        "title": "8. GameState with empty players dict",
+        "content": "```python\ndef test_game_state_empty_players():\n    state = GameState(players={}, current_round=0, ...)\n    assert state.total_cost() == 0\n    assert state.is_round_complete()  # vacuously true\n```\n\n---\n\n",
+        "level": 4
+      },
+      {
+        "title": "Priority 3 — Medium / Low",
+        "content": "\n",
+        "level": 3
+      },
+      {
+        "title": "9. Abstract class cannot be instantiated",
+        "content": "```python\ndef test_base_ai_player_is_abstract():\n    with pytest.raises(TypeError):\n        BaseAIPlayer()\n```\n\n",
+        "level": 4
+      },
+      {
+        "title": "10. GameConfig boundary values",
+        "content": "```python\n@pytest.mark.parametrize(\"rounds\", [1, 50, 100])\ndef test_game_config_rounds_boundary(rounds):\n    cfg = GameConfig(num_rounds=rounds)\n    assert cfg.num_rounds == rounds\n\ndef test_game_config_empty_demand_pattern_raises():\n    with pytest.raises(ValidationError):\n        GameConfig(demand_pattern=[])\n```\n\n",
+        "level": 4
+      },
+      {
+        "title": "11. advance_shipments with empty list",
+        "content": "```python\ndef test_advance_shipments_empty():\n    players = make_default_players()\n    for p in players.values():\n        p.incoming_shipments = []\n    advance_shipments(players)  # must not raise\n```\n\n",
+        "level": 4
+      },
+      {
+        "title": "12. get_visible_state nonexistent role",
+        "content": "```python\ndef test_get_visible_state_invalid_role_raises():\n    engine = GameEngine()\n    state = engine.create_game()\n    state = engine.start_game(state)\n    with pytest.raises((KeyError, ValueError)):\n        engine.get_visible_state(state, \"nonexistent_role\")\n```\n\n---\n\n",
+        "level": 4
+      },
+      {
+        "title": "Unimplemented Module",
+        "content": "\n`core/reporting/` — empty. No tests possible yet. When implemented, needs:\n- `test_report_generates_valid_html()`\n- `test_report_generates_valid_csv()`  \n- `test_report_handles_zero_round_game()`\n- `test_report_all_roles_present()`\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "Summary",
+        "content": "| Severity | Count | Top gap |\n|----------|-------|---------|\n| High | 3 | Backlog isolation, delay interaction, mixed players |\n| Medium | 7 | Boundaries, overwrites, zero-demand, empty state |\n| Low | 4 | Abstract check, overflow, precision |\n| Unimplemented | 1 | Entire reporting module |\n\nCurrent coverage: good happy-path (~80% function), poor scenario (~40%). The three high-severity gaps can mask real supply-chain logic bugs.",
+        "level": 3
+      }
+    ],
+    "codeBlocks": [
+      {
+        "language": "python",
+        "code": "# tests/core/test_order_processor.py\ndef test_backlog_carries_over_multiple_rounds():\n    \"\"\"Backlog from round 1 adds to round 2 demand.\"\"\"\n    players = {role: PlayerState(inventory=0, backlog=5, ...) for role in ROLE_ORDER}\n    orders = {role: 10 for role in ROLE_ORDER}\n    fulfill_orders(players, orders, customer_demand=10, config=default_config())\n    # backlog should accumulate, not reset\n    assert players[PlayerRole.RETAILER].backlog > 5"
+      },
+      {
+        "language": "python",
+        "code": "def test_order_delay_distinct_from_shipping_delay():\n    config = GameConfig(shipping_delay=2, order_delay=3)\n    engine = GameEngine()\n    state = engine.create_game(config=config)\n    state = engine.start_game(state)\n    # Run enough rounds to see both pipelines drain independently\n    for _ in range(6):\n        state = engine.process_round(state)\n    # factory shipment arrives after order_delay, not shipping_delay\n    assert state.players[PlayerRole.FACTORY].cumulative_cost > 0"
+      },
+      {
+        "language": "python",
+        "code": "def test_mixed_human_ai_game():\n    engine = GameEngine()\n    state = engine.create_game(ai_roles={PlayerRole.WHOLESALER, PlayerRole.DISTRIBUTOR})\n    state = engine.start_game(state)\n    # Humans must submit before round can process\n    assert not state.is_round_complete()\n    state = engine.submit_order(state, PlayerRole.RETAILER, 4)\n    state = engine.submit_order(state, PlayerRole.FACTORY, 4)\n    assert state.is_round_complete()\n    state = engine.process_round(state)\n    assert state.current_round == 1"
+      },
+      {
+        "language": "python",
+        "code": "def test_game_ends_after_one_round():\n    config = GameConfig(num_rounds=1)\n    engine = GameEngine()\n    state = engine.create_game(config=config, ai_roles=set(ROLE_ORDER))\n    state = engine.start_game(state)\n    state = engine.process_round(state)\n    assert state.phase == GamePhase.FINISHED"
+      },
+      {
+        "language": "python",
+        "code": "def test_process_round_on_finished_game_raises():\n    engine = GameEngine()\n    state = engine.create_game(config=GameConfig(num_rounds=1), ai_roles=set(ROLE_ORDER))\n    state = engine.start_game(state)\n    state = engine.process_round(state)\n    assert state.phase == GamePhase.FINISHED\n    with pytest.raises((ValueError, RuntimeError)):\n        engine.process_round(state)"
+      },
+      {
+        "language": "python",
+        "code": "def test_submit_order_overwrites_previous():\n    engine = GameEngine()\n    state = engine.create_game(ai_roles=set())\n    state = engine.start_game(state)\n    state = engine.submit_order(state, PlayerRole.RETAILER, 10)\n    state = engine.submit_order(state, PlayerRole.RETAILER, 99)  # overwrite\n    assert state.orders_this_round[PlayerRole.RETAILER] == 99"
+      },
+      {
+        "language": "python",
+        "code": "def test_fulfill_orders_zero_demand():\n    players = make_default_players(inventory=20)\n    orders = {role: 4 for role in ROLE_ORDER}\n    fulfill_orders(players, orders, customer_demand=0, config=default_config())\n    assert players[PlayerRole.RETAILER].backlog == 0\n    assert players[PlayerRole.RETAILER].inventory == 20  # nothing consumed"
+      },
+      {
+        "language": "python",
+        "code": "def test_game_state_empty_players():\n    state = GameState(players={}, current_round=0, ...)\n    assert state.total_cost() == 0\n    assert state.is_round_complete()  # vacuously true"
+      },
+      {
+        "language": "python",
+        "code": "def test_base_ai_player_is_abstract():\n    with pytest.raises(TypeError):\n        BaseAIPlayer()"
+      },
+      {
+        "language": "python",
+        "code": "@pytest.mark.parametrize(\"rounds\", [1, 50, 100])\ndef test_game_config_rounds_boundary(rounds):\n    cfg = GameConfig(num_rounds=rounds)\n    assert cfg.num_rounds == rounds\n\ndef test_game_config_empty_demand_pattern_raises():\n    with pytest.raises(ValidationError):\n        GameConfig(demand_pattern=[])"
+      },
+      {
+        "language": "python",
+        "code": "def test_advance_shipments_empty():\n    players = make_default_players()\n    for p in players.values():\n        p.incoming_shipments = []\n    advance_shipments(players)  # must not raise"
+      },
+      {
+        "language": "python",
+        "code": "def test_get_visible_state_invalid_role_raises():\n    engine = GameEngine()\n    state = engine.create_game()\n    state = engine.start_game(state)\n    with pytest.raises((KeyError, ValueError)):\n        engine.get_visible_state(state, \"nonexistent_role\")"
+      }
+    ]
+  },
+  "durationMs": 99854,
+  "model": "sonnet",
+  "sandboxMode": "permissive",
+  "workerType": "testgaps",
+  "timestamp": "2026-06-02T13:28:52.042Z",
+  "executionId": "testgaps_1780406832188_7afpol"
+}

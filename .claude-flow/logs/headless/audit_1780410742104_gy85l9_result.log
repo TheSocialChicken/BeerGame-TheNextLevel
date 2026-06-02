@@ -1,0 +1,16 @@
+[2026-06-02T14:32:34.680Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "Provided context = coverage report artifact only. Not actual app code.\n\nScan real codebase for vulns? I can:\n1. Check `core/` (Python backend) for hardcoded secrets, SQL injection, auth issues\n2. Check `frontend/` (SvelteKit) for XSS, dependency vulns\n3. Check `infra/` (deployment) for credential leaks\n4. Audit dependencies (Python + Node)\n\nWhich areas matter most? Or scan all three?\n\nAlso — do you want:\n- **Quick pass**: grep for obvious patterns (hardcoded API keys, SQL concat, eval calls)\n- **Deep audit**: read actual code logic, check validation flows, auth guards\n- **Dependency report**: check for known CVEs in requirements/package.json\n",
+  "parsedOutput": {
+    "parseError": true,
+    "rawOutput": "Provided context = coverage report artifact only. Not actual app code.\n\nScan real codebase for vulns? I can:\n1. Check `core/` (Python backend) for hardcoded secrets, SQL injection, auth issues\n2. Check `frontend/` (SvelteKit) for XSS, dependency vulns\n3. Check `infra/` (deployment) for credential leaks\n4. Audit dependencies (Python + Node)\n\nWhich areas matter most? Or scan all three?\n\nAlso — do you want:\n- **Quick pass**: grep for obvious patterns (hardcoded API keys, SQL concat, eval calls)\n- **Deep audit**: read actual code logic, check validation flows, auth guards\n- **Dependency report**: check for known CVEs in requirements/package.json\n"
+  },
+  "durationMs": 12576,
+  "model": "haiku",
+  "sandboxMode": "strict",
+  "workerType": "audit",
+  "timestamp": "2026-06-02T14:32:34.680Z",
+  "executionId": "audit_1780410742104_gy85l9"
+}

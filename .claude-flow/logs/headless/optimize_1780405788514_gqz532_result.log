@@ -1,0 +1,115 @@
+[2026-06-02T13:10:51.673Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "Got enough. Analysis is purely Python core — no frontend or DB exist yet. Here's what's real.\n\n---\n\n## Performance Analysis — BeerGame Core\n\nNo React, no DB queries yet, so \"N+1\" and \"re-renders\" don't apply. Here's what *does* exist and matters.\n\n---\n\n### 1. Memory leak — `incoming_orders` grows forever\n\n**`order_processor.py:72`, `game.py:38`**\n\nOrders appended to `incoming_orders` every round, never read, never cleared. After 26 rounds factory has 26 dead ints.\n\n```python\n# order_processor.py:70-72 — appends but nothing ever pops this\nupstream_ps.incoming_orders.append(order_qty)\n```\n\n`incoming_orders` in `PlayerState` is never consumed anywhere in the codebase. Either use it (read + clear each round) or drop the field entirely.\n\n**Fix:**\n```python\n# place_orders: read then clear, or remove the field\nupstream_ps.incoming_orders.append(order_qty)\n# ... after fulfillment reads it:\nps.incoming_orders.clear()\n```\n\n---\n\n### 2. Redundant Pydantic object creation every round\n\n**`order_processor.py:9-12`**\n\n`advance_shipments` destroys and recreates `IncomingShipment` objects just to decrement a counter:\n\n```python\n# Current: allocates N new Pydantic models per round\nps.incoming_shipments = [\n    IncomingShipment(quantity=s.quantity, arrives_in_rounds=s.arrives_in_rounds - 1)\n    for s in ps.incoming_shipments\n    if s.arrives_in_rounds > 1\n]\n```\n\nPydantic v2 model instantiation has validation overhead. With `model_config = ConfigDict(frozen=False)` you can mutate in place:\n\n```python\nfor s in ps.incoming_shipments:\n    s.arrives_in_rounds -= 1\nps.incoming_shipments = [s for s in ps.incoming_shipments if s.arrives_in_rounds > 0]\n```\n\nOr use a plain `dataclass` for `IncomingShipment` — it's a value object with no validation needs.\n\n---\n\n### 3. `is_round_complete()` rebuilds set on every call\n\n**`game.py:56`**\n\n```python\ndef is_round_complete(self) -> bool:\n    active_roles = {role for role, ps in self.players.items() if not ps.is_ai}  # rebuilt every call\n    return active_roles.issubset(self.orders_this_round.keys())\n```\n\n`is_ai` flags never change during a game. Cache the set:\n\n```python\nclass GameState(BaseModel):\n    ...\n    _human_roles: frozenset[PlayerRole] | None = None  # private, not serialized\n\n    def model_post_init(self, __context):\n        self._human_roles = frozenset(r for r, ps in self.players.items() if not ps.is_ai)\n\n    def is_round_complete(self) -> bool:\n        return (self._human_roles or frozenset()).issubset(self.orders_this_round.keys())\n```\n\n---\n\n### 4. Logic duplication — cost formula will drift\n\n**`game.py:42` vs `order_processor.py:86-90`**\n\n```python\n# game.py\ndef round_cost(self) -> float:\n    return self.inventory * HOLDING_COST_PER_UNIT + self.backlog * BACKLOG_COST_PER_UNIT\n\n# order_processor.py — same formula, different constants source\ncost = ps.inventory * state.config.holding_cost + ps.backlog * state.config.backlog_cost\n```\n\n`round_cost()` uses module-level constants; `accrue_costs()` uses `state.config` values. If config overrides costs (which `GameConfig` supports), `round_cost()` returns wrong values. Fix: delete `round_cost()` or have it take config.\n\n---\n\n### 5. Future caching — demand pattern lookup\n\n**`game_engine.py:67`**\n\n```python\ndemand = state.config.demand_pattern[round_idx % len(state.config.demand_pattern)]\n```\n\nNot a problem now, but when `demand_pattern` becomes a heavy computed/DB-fetched object, pre-resolving it at game creation is the right move. Fine to leave for now.\n\n---\n\n### Priority order\n\n| # | Issue | Impact | Fix effort |\n|---|-------|--------|-----------|\n| 1 | `incoming_orders` unbounded | Real memory growth per game | Low — clear or remove |\n| 2 | Pydantic object churn | CPU per round × players | Low — mutate in place |\n| 3 | Cost formula drift | Correctness bug, not perf | Low — one source of truth |\n| 4 | `is_round_complete` set rebuild | Negligible at 4 players | Low |\n\nItems 1 and 3 are correctness issues masquerading as perf. Fix those first.\n",
+  "parsedOutput": {
+    "sections": [
+      {
+        "title": "Performance Analysis — BeerGame Core",
+        "content": "\nNo React, no DB queries yet, so \"N+1\" and \"re-renders\" don't apply. Here's what *does* exist and matters.\n\n---\n\n",
+        "level": 2
+      },
+      {
+        "title": "1. Memory leak — `incoming_orders` grows forever",
+        "content": "\n**`order_processor.py:72`, `game.py:38`**\n\nOrders appended to `incoming_orders` every round, never read, never cleared. After 26 rounds factory has 26 dead ints.\n\n```python\n",
+        "level": 3
+      },
+      {
+        "title": "order_processor.py:70-72 — appends but nothing ever pops this",
+        "content": "upstream_ps.incoming_orders.append(order_qty)\n```\n\n`incoming_orders` in `PlayerState` is never consumed anywhere in the codebase. Either use it (read + clear each round) or drop the field entirely.\n\n**Fix:**\n```python\n",
+        "level": 1
+      },
+      {
+        "title": "place_orders: read then clear, or remove the field",
+        "content": "upstream_ps.incoming_orders.append(order_qty)\n",
+        "level": 1
+      },
+      {
+        "title": "... after fulfillment reads it:",
+        "content": "ps.incoming_orders.clear()\n```\n\n---\n\n",
+        "level": 1
+      },
+      {
+        "title": "2. Redundant Pydantic object creation every round",
+        "content": "\n**`order_processor.py:9-12`**\n\n`advance_shipments` destroys and recreates `IncomingShipment` objects just to decrement a counter:\n\n```python\n",
+        "level": 3
+      },
+      {
+        "title": "Current: allocates N new Pydantic models per round",
+        "content": "ps.incoming_shipments = [\n    IncomingShipment(quantity=s.quantity, arrives_in_rounds=s.arrives_in_rounds - 1)\n    for s in ps.incoming_shipments\n    if s.arrives_in_rounds > 1\n]\n```\n\nPydantic v2 model instantiation has validation overhead. With `model_config = ConfigDict(frozen=False)` you can mutate in place:\n\n```python\nfor s in ps.incoming_shipments:\n    s.arrives_in_rounds -= 1\nps.incoming_shipments = [s for s in ps.incoming_shipments if s.arrives_in_rounds > 0]\n```\n\nOr use a plain `dataclass` for `IncomingShipment` — it's a value object with no validation needs.\n\n---\n\n",
+        "level": 1
+      },
+      {
+        "title": "3. `is_round_complete()` rebuilds set on every call",
+        "content": "\n**`game.py:56`**\n\n```python\ndef is_round_complete(self) -> bool:\n    active_roles = {role for role, ps in self.players.items() if not ps.is_ai}  # rebuilt every call\n    return active_roles.issubset(self.orders_this_round.keys())\n```\n\n`is_ai` flags never change during a game. Cache the set:\n\n```python\nclass GameState(BaseModel):\n    ...\n    _human_roles: frozenset[PlayerRole] | None = None  # private, not serialized\n\n    def model_post_init(self, __context):\n        self._human_roles = frozenset(r for r, ps in self.players.items() if not ps.is_ai)\n\n    def is_round_complete(self) -> bool:\n        return (self._human_roles or frozenset()).issubset(self.orders_this_round.keys())\n```\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "4. Logic duplication — cost formula will drift",
+        "content": "\n**`game.py:42` vs `order_processor.py:86-90`**\n\n```python\n",
+        "level": 3
+      },
+      {
+        "title": "game.py",
+        "content": "def round_cost(self) -> float:\n    return self.inventory * HOLDING_COST_PER_UNIT + self.backlog * BACKLOG_COST_PER_UNIT\n\n",
+        "level": 1
+      },
+      {
+        "title": "order_processor.py — same formula, different constants source",
+        "content": "cost = ps.inventory * state.config.holding_cost + ps.backlog * state.config.backlog_cost\n```\n\n`round_cost()` uses module-level constants; `accrue_costs()` uses `state.config` values. If config overrides costs (which `GameConfig` supports), `round_cost()` returns wrong values. Fix: delete `round_cost()` or have it take config.\n\n---\n\n",
+        "level": 1
+      },
+      {
+        "title": "5. Future caching — demand pattern lookup",
+        "content": "\n**`game_engine.py:67`**\n\n```python\ndemand = state.config.demand_pattern[round_idx % len(state.config.demand_pattern)]\n```\n\nNot a problem now, but when `demand_pattern` becomes a heavy computed/DB-fetched object, pre-resolving it at game creation is the right move. Fine to leave for now.\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "Priority order",
+        "content": "| # | Issue | Impact | Fix effort |\n|---|-------|--------|-----------|\n| 1 | `incoming_orders` unbounded | Real memory growth per game | Low — clear or remove |\n| 2 | Pydantic object churn | CPU per round × players | Low — mutate in place |\n| 3 | Cost formula drift | Correctness bug, not perf | Low — one source of truth |\n| 4 | `is_round_complete` set rebuild | Negligible at 4 players | Low |\n\nItems 1 and 3 are correctness issues masquerading as perf. Fix those first.",
+        "level": 3
+      }
+    ],
+    "codeBlocks": [
+      {
+        "language": "python",
+        "code": "# order_processor.py:70-72 — appends but nothing ever pops this\nupstream_ps.incoming_orders.append(order_qty)"
+      },
+      {
+        "language": "python",
+        "code": "# place_orders: read then clear, or remove the field\nupstream_ps.incoming_orders.append(order_qty)\n# ... after fulfillment reads it:\nps.incoming_orders.clear()"
+      },
+      {
+        "language": "python",
+        "code": "# Current: allocates N new Pydantic models per round\nps.incoming_shipments = [\n    IncomingShipment(quantity=s.quantity, arrives_in_rounds=s.arrives_in_rounds - 1)\n    for s in ps.incoming_shipments\n    if s.arrives_in_rounds > 1\n]"
+      },
+      {
+        "language": "python",
+        "code": "for s in ps.incoming_shipments:\n    s.arrives_in_rounds -= 1\nps.incoming_shipments = [s for s in ps.incoming_shipments if s.arrives_in_rounds > 0]"
+      },
+      {
+        "language": "python",
+        "code": "def is_round_complete(self) -> bool:\n    active_roles = {role for role, ps in self.players.items() if not ps.is_ai}  # rebuilt every call\n    return active_roles.issubset(self.orders_this_round.keys())"
+      },
+      {
+        "language": "python",
+        "code": "class GameState(BaseModel):\n    ...\n    _human_roles: frozenset[PlayerRole] | None = None  # private, not serialized\n\n    def model_post_init(self, __context):\n        self._human_roles = frozenset(r for r, ps in self.players.items() if not ps.is_ai)\n\n    def is_round_complete(self) -> bool:\n        return (self._human_roles or frozenset()).issubset(self.orders_this_round.keys())"
+      },
+      {
+        "language": "python",
+        "code": "# game.py\ndef round_cost(self) -> float:\n    return self.inventory * HOLDING_COST_PER_UNIT + self.backlog * BACKLOG_COST_PER_UNIT\n\n# order_processor.py — same formula, different constants source\ncost = ps.inventory * state.config.holding_cost + ps.backlog * state.config.backlog_cost"
+      },
+      {
+        "language": "python",
+        "code": "demand = state.config.demand_pattern[round_idx % len(state.config.demand_pattern)]"
+      }
+    ]
+  },
+  "durationMs": 63159,
+  "model": "sonnet",
+  "sandboxMode": "permissive",
+  "workerType": "optimize",
+  "timestamp": "2026-06-02T13:10:51.673Z",
+  "executionId": "optimize_1780405788514_gqz532"
+}

@@ -1,0 +1,16 @@
+[2026-06-02T13:28:40.145Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "Need actual codebase scan. Context shows mostly test coverage HTML + docs, not production code.\n\nWant me to scan the repo? Will check:\n- `core/` Python backend for SQL injection, hardcoded secrets, auth issues\n- `frontend/` TypeScript/Svelte for XSS, insecure dependencies\n- `infra/` for exposed credentials in Ansible/Docker\n- `.env`, `*.py`, `*.ts` for patterns\n\nScan depth?\n- **quick**: top-level files + grep for secrets/SQL patterns\n- **thorough**: full recursive analysis with dependency audit\n\nOr paste specific files you're worried about.\n",
+  "parsedOutput": {
+    "parseError": true,
+    "rawOutput": "Need actual codebase scan. Context shows mostly test coverage HTML + docs, not production code.\n\nWant me to scan the repo? Will check:\n- `core/` Python backend for SQL injection, hardcoded secrets, auth issues\n- `frontend/` TypeScript/Svelte for XSS, insecure dependencies\n- `infra/` for exposed credentials in Ansible/Docker\n- `.env`, `*.py`, `*.ts` for patterns\n\nScan depth?\n- **quick**: top-level files + grep for secrets/SQL patterns\n- **thorough**: full recursive analysis with dependency audit\n\nOr paste specific files you're worried about.\n"
+  },
+  "durationMs": 13191,
+  "model": "haiku",
+  "sandboxMode": "strict",
+  "workerType": "audit",
+  "timestamp": "2026-06-02T13:28:40.145Z",
+  "executionId": "audit_1780406906954_u8qv4g"
+}

@@ -1,0 +1,125 @@
+[2026-06-02T13:07:12.185Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "Core is 99.45% covered. One line missed, plus integration layer is entirely absent. Here's the full gap map with skeletons:\n\n---\n\n## Coverage gaps\n\n### Gap 1 — demand pattern wrap-around (`game_engine.py:64`)\n\nOnly uncovered line. Modulo logic never exercised when `num_rounds > len(demand_pattern)`.\n\n```python\n# tests/core/test_engine.py\ndef test_demand_pattern_wraps_around():\n    \"\"\"Rounds beyond demand_pattern length reuse from start via modulo.\"\"\"\n    engine = GameEngine()\n    config = GameConfig(\n        num_rounds=6,\n        demand_pattern=[4, 8],  # len=2, so round 3 wraps → 4, round 4 → 8\n    )\n    state = engine.create_game(config)\n    state = engine.start_game(state)\n\n    demands = []\n    for _ in range(6):\n        # force AI/human orders so round completes\n        for role in state.players:\n            state = engine.submit_order(state, role, 4)\n        prev_round = state.current_round\n        state = engine.process_round(state)\n        # verify state advances; actual demand assertion requires exposing it\n\n    assert state.current_round == 6\n    # Cost profile should reflect alternating demand, not crash\n```\n\n---\n\n### Gap 2 — `submit_order` error handling\n\n```python\n# tests/core/test_engine.py\ndef test_submit_order_unknown_role_raises():\n    engine = GameEngine()\n    state = engine.create_game()\n    state = engine.start_game(state)\n    with pytest.raises((KeyError, ValueError)):\n        engine.submit_order(state, \"NOT_A_ROLE\", 4)  # type: ignore\n\ndef test_submit_order_negative_quantity_raises():\n    engine = GameEngine()\n    state = engine.create_game()\n    state = engine.start_game(state)\n    with pytest.raises((ValueError, AssertionError)):\n        engine.submit_order(state, PlayerRole.RETAILER, -1)\n\ndef test_submit_order_on_finished_game_raises():\n    engine = GameEngine()\n    config = GameConfig(num_rounds=1)\n    state = engine.create_game(config)\n    state = engine.start_game(state)\n    for role in list(state.players):\n        state = engine.submit_order(state, role, 4)\n    state = engine.process_round(state)\n    assert state.phase == GamePhase.FINISHED\n    with pytest.raises((ValueError, RuntimeError)):\n        engine.submit_order(state, PlayerRole.RETAILER, 4)\n```\n\n---\n\n### Gap 3 — `start_game` idempotency / invalid transitions\n\n```python\ndef test_start_game_twice_raises():\n    engine = GameEngine()\n    state = engine.create_game()\n    state = engine.start_game(state)\n    with pytest.raises((ValueError, RuntimeError)):\n        engine.start_game(state)  # already ACTIVE\n```\n\n---\n\n### Gap 4 — `get_visible_state` for Factory role\n\nFactory has no upstream; verify dict doesn't blow up and upstream fields are absent/None.\n\n```python\ndef test_get_visible_state_factory_has_no_upstream():\n    engine = GameEngine()\n    state = engine.create_game()\n    visible = engine.get_visible_state(state, PlayerRole.FACTORY)\n    assert \"upstream_order\" not in visible or visible.get(\"upstream_order\") is None\n```\n\n---\n\n### Gap 5 — Order processor edge cases\n\n```python\n# tests/core/test_order_processor.py (new file)\nimport pytest\nfrom core.engine.order_processor import advance_shipments, fulfill_orders, accrue_costs\nfrom core.models.game import GameState, GameConfig, PlayerState\nfrom core.models.player import PlayerRole\n\ndef make_state(**overrides) -> GameState:\n    \"\"\"Helper: minimal GameState for order_processor unit tests.\"\"\"\n    ...  # build minimal valid GameState with overrides applied\n\ndef test_fulfill_orders_zero_inventory_zero_backlog():\n    state = make_state(inventory=0, backlog=0, incoming_order=4)\n    result = fulfill_orders(state, customer_demand=4)\n    # Nothing to ship; backlog accumulates\n    assert result.players[PlayerRole.RETAILER].backlog == 4\n\ndef test_fulfill_orders_exact_match():\n    state = make_state(inventory=4, backlog=0)\n    result = fulfill_orders(state, customer_demand=4)\n    assert result.players[PlayerRole.RETAILER].inventory == 0\n    assert result.players[PlayerRole.RETAILER].backlog == 0\n\ndef test_advance_shipments_shipping_delay_longer_than_game():\n    config = GameConfig(num_rounds=2, shipping_delay=5)\n    state = make_state(config=config)\n    # Shipments in pipeline should never arrive within game length\n    result = advance_shipments(state)\n    # All incoming_shipments counters still > 0\n    for player in result.players.values():\n        for s in player.incoming_shipments:\n            assert s.arrives_in_rounds > 0\n\ndef test_accrue_costs_zero_inventory_zero_backlog():\n    state = make_state(inventory=0, backlog=0)\n    before = {r: p.total_cost for r, p in state.players.items()}\n    result = accrue_costs(state)\n    after = {r: p.total_cost for r, p in result.players.items()}\n    assert before == after  # no cost delta\n```\n\n---\n\n### Gap 6 — AI player edge cases\n\n```python\n# tests/core/test_ai_players.py additions\ndef test_order_up_to_pipeline_exactly_at_target():\n    \"\"\"No order placed when pipeline + inventory already meets target.\"\"\"\n    ai = OrderUpToAI(PlayerRole.RETAILER)\n    state = make_state_with(inventory=12, pipeline=4)  # 12+4 = target=16\n    order = ai.decide_order(state)\n    assert order == 0\n\ndef test_order_up_to_single_element_demand_pattern():\n    config = GameConfig(demand_pattern=[4])\n    engine = GameEngine()\n    state = engine.create_game(config, ai_roles={PlayerRole.RETAILER})\n    state = engine.start_game(state)\n    # Should not crash on repeated single element\n    for _ in range(5):\n        for role in state.players:\n            state = engine.submit_order(state, role, 4)\n        state = engine.process_round(state)\n```\n\n---\n\n### Gap 7 — Integration layer (not yet implemented — skeletons ready for when FastAPI routes land)\n\n```python\n# tests/integration/test_api.py\nimport pytest\nfrom httpx import AsyncClient\nfrom core.api.app import app  # doesn't exist yet\n\n@pytest.mark.asyncio\nasync def test_create_game_endpoint():\n    async with AsyncClient(app=app, base_url=\"http://test\") as client:\n        resp = await client.post(\"/games\", json={})\n    assert resp.status_code == 201\n    assert \"game_id\" in resp.json()\n\n@pytest.mark.asyncio\nasync def test_submit_order_endpoint_invalid_role_returns_422():\n    async with AsyncClient(app=app, base_url=\"http://test\") as client:\n        resp = await client.post(\"/games/abc/orders\", json={\"role\": \"INVALID\", \"quantity\": 4})\n    assert resp.status_code == 422\n```\n\n```python\n# tests/integration/test_websocket.py\nimport pytest\nfrom httpx_ws import aconnect_ws\nfrom core.api.app import app\n\n@pytest.mark.asyncio\nasync def test_websocket_connects_and_receives_state():\n    async with aconnect_ws(\"/ws/games/test-id\", app) as ws:\n        msg = await ws.receive_json()\n        assert \"phase\" in msg\n\n@pytest.mark.asyncio\nasync def test_websocket_disconnects_gracefully():\n    # Client closes mid-game — server should not crash\n    ...\n```\n\n---\n\n## Summary\n\n| Priority | Gap | Effort |\n|----------|-----|--------|\n| P1 | demand wrap-around (`game_engine.py:64`) | 5 min |\n| P1 | `submit_order` negative/invalid/finished guards | 10 min |\n| P1 | `start_game` double-call | 5 min |\n| P2 | Order processor unit tests (zero-inventory, exact-match) | 20 min |\n| P2 | AI edge cases (pipeline=target, single-element pattern) | 15 min |\n| P3 | API + WebSocket integration tests | needs API impl first |\n\nP1+P2 close the only real gaps in existing code. P3 blocks on features not yet built.\n",
+  "parsedOutput": {
+    "sections": [
+      {
+        "title": "Coverage gaps",
+        "content": "\n",
+        "level": 2
+      },
+      {
+        "title": "Gap 1 — demand pattern wrap-around (`game_engine.py:64`)",
+        "content": "\nOnly uncovered line. Modulo logic never exercised when `num_rounds > len(demand_pattern)`.\n\n```python\n",
+        "level": 3
+      },
+      {
+        "title": "tests/core/test_engine.py",
+        "content": "def test_demand_pattern_wraps_around():\n    \"\"\"Rounds beyond demand_pattern length reuse from start via modulo.\"\"\"\n    engine = GameEngine()\n    config = GameConfig(\n        num_rounds=6,\n        demand_pattern=[4, 8],  # len=2, so round 3 wraps → 4, round 4 → 8\n    )\n    state = engine.create_game(config)\n    state = engine.start_game(state)\n\n    demands = []\n    for _ in range(6):\n        # force AI/human orders so round completes\n        for role in state.players:\n            state = engine.submit_order(state, role, 4)\n        prev_round = state.current_round\n        state = engine.process_round(state)\n        # verify state advances; actual demand assertion requires exposing it\n\n    assert state.current_round == 6\n    # Cost profile should reflect alternating demand, not crash\n```\n\n---\n\n",
+        "level": 1
+      },
+      {
+        "title": "Gap 2 — `submit_order` error handling",
+        "content": "\n```python\n",
+        "level": 3
+      },
+      {
+        "title": "tests/core/test_engine.py",
+        "content": "def test_submit_order_unknown_role_raises():\n    engine = GameEngine()\n    state = engine.create_game()\n    state = engine.start_game(state)\n    with pytest.raises((KeyError, ValueError)):\n        engine.submit_order(state, \"NOT_A_ROLE\", 4)  # type: ignore\n\ndef test_submit_order_negative_quantity_raises():\n    engine = GameEngine()\n    state = engine.create_game()\n    state = engine.start_game(state)\n    with pytest.raises((ValueError, AssertionError)):\n        engine.submit_order(state, PlayerRole.RETAILER, -1)\n\ndef test_submit_order_on_finished_game_raises():\n    engine = GameEngine()\n    config = GameConfig(num_rounds=1)\n    state = engine.create_game(config)\n    state = engine.start_game(state)\n    for role in list(state.players):\n        state = engine.submit_order(state, role, 4)\n    state = engine.process_round(state)\n    assert state.phase == GamePhase.FINISHED\n    with pytest.raises((ValueError, RuntimeError)):\n        engine.submit_order(state, PlayerRole.RETAILER, 4)\n```\n\n---\n\n",
+        "level": 1
+      },
+      {
+        "title": "Gap 3 — `start_game` idempotency / invalid transitions",
+        "content": "\n```python\ndef test_start_game_twice_raises():\n    engine = GameEngine()\n    state = engine.create_game()\n    state = engine.start_game(state)\n    with pytest.raises((ValueError, RuntimeError)):\n        engine.start_game(state)  # already ACTIVE\n```\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "Gap 4 — `get_visible_state` for Factory role",
+        "content": "\nFactory has no upstream; verify dict doesn't blow up and upstream fields are absent/None.\n\n```python\ndef test_get_visible_state_factory_has_no_upstream():\n    engine = GameEngine()\n    state = engine.create_game()\n    visible = engine.get_visible_state(state, PlayerRole.FACTORY)\n    assert \"upstream_order\" not in visible or visible.get(\"upstream_order\") is None\n```\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "Gap 5 — Order processor edge cases",
+        "content": "\n```python\n",
+        "level": 3
+      },
+      {
+        "title": "tests/core/test_order_processor.py (new file)",
+        "content": "import pytest\nfrom core.engine.order_processor import advance_shipments, fulfill_orders, accrue_costs\nfrom core.models.game import GameState, GameConfig, PlayerState\nfrom core.models.player import PlayerRole\n\ndef make_state(**overrides) -> GameState:\n    \"\"\"Helper: minimal GameState for order_processor unit tests.\"\"\"\n    ...  # build minimal valid GameState with overrides applied\n\ndef test_fulfill_orders_zero_inventory_zero_backlog():\n    state = make_state(inventory=0, backlog=0, incoming_order=4)\n    result = fulfill_orders(state, customer_demand=4)\n    # Nothing to ship; backlog accumulates\n    assert result.players[PlayerRole.RETAILER].backlog == 4\n\ndef test_fulfill_orders_exact_match():\n    state = make_state(inventory=4, backlog=0)\n    result = fulfill_orders(state, customer_demand=4)\n    assert result.players[PlayerRole.RETAILER].inventory == 0\n    assert result.players[PlayerRole.RETAILER].backlog == 0\n\ndef test_advance_shipments_shipping_delay_longer_than_game():\n    config = GameConfig(num_rounds=2, shipping_delay=5)\n    state = make_state(config=config)\n    # Shipments in pipeline should never arrive within game length\n    result = advance_shipments(state)\n    # All incoming_shipments counters still > 0\n    for player in result.players.values():\n        for s in player.incoming_shipments:\n            assert s.arrives_in_rounds > 0\n\ndef test_accrue_costs_zero_inventory_zero_backlog():\n    state = make_state(inventory=0, backlog=0)\n    before = {r: p.total_cost for r, p in state.players.items()}\n    result = accrue_costs(state)\n    after = {r: p.total_cost for r, p in result.players.items()}\n    assert before == after  # no cost delta\n```\n\n---\n\n",
+        "level": 1
+      },
+      {
+        "title": "Gap 6 — AI player edge cases",
+        "content": "\n```python\n",
+        "level": 3
+      },
+      {
+        "title": "tests/core/test_ai_players.py additions",
+        "content": "def test_order_up_to_pipeline_exactly_at_target():\n    \"\"\"No order placed when pipeline + inventory already meets target.\"\"\"\n    ai = OrderUpToAI(PlayerRole.RETAILER)\n    state = make_state_with(inventory=12, pipeline=4)  # 12+4 = target=16\n    order = ai.decide_order(state)\n    assert order == 0\n\ndef test_order_up_to_single_element_demand_pattern():\n    config = GameConfig(demand_pattern=[4])\n    engine = GameEngine()\n    state = engine.create_game(config, ai_roles={PlayerRole.RETAILER})\n    state = engine.start_game(state)\n    # Should not crash on repeated single element\n    for _ in range(5):\n        for role in state.players:\n            state = engine.submit_order(state, role, 4)\n        state = engine.process_round(state)\n```\n\n---\n\n",
+        "level": 1
+      },
+      {
+        "title": "Gap 7 — Integration layer (not yet implemented — skeletons ready for when FastAPI routes land)",
+        "content": "\n```python\n",
+        "level": 3
+      },
+      {
+        "title": "tests/integration/test_api.py",
+        "content": "import pytest\nfrom httpx import AsyncClient\nfrom core.api.app import app  # doesn't exist yet\n\n@pytest.mark.asyncio\nasync def test_create_game_endpoint():\n    async with AsyncClient(app=app, base_url=\"http://test\") as client:\n        resp = await client.post(\"/games\", json={})\n    assert resp.status_code == 201\n    assert \"game_id\" in resp.json()\n\n@pytest.mark.asyncio\nasync def test_submit_order_endpoint_invalid_role_returns_422():\n    async with AsyncClient(app=app, base_url=\"http://test\") as client:\n        resp = await client.post(\"/games/abc/orders\", json={\"role\": \"INVALID\", \"quantity\": 4})\n    assert resp.status_code == 422\n```\n\n```python\n",
+        "level": 1
+      },
+      {
+        "title": "tests/integration/test_websocket.py",
+        "content": "import pytest\nfrom httpx_ws import aconnect_ws\nfrom core.api.app import app\n\n@pytest.mark.asyncio\nasync def test_websocket_connects_and_receives_state():\n    async with aconnect_ws(\"/ws/games/test-id\", app) as ws:\n        msg = await ws.receive_json()\n        assert \"phase\" in msg\n\n@pytest.mark.asyncio\nasync def test_websocket_disconnects_gracefully():\n    # Client closes mid-game — server should not crash\n    ...\n```\n\n---\n\n",
+        "level": 1
+      },
+      {
+        "title": "Summary",
+        "content": "| Priority | Gap | Effort |\n|----------|-----|--------|\n| P1 | demand wrap-around (`game_engine.py:64`) | 5 min |\n| P1 | `submit_order` negative/invalid/finished guards | 10 min |\n| P1 | `start_game` double-call | 5 min |\n| P2 | Order processor unit tests (zero-inventory, exact-match) | 20 min |\n| P2 | AI edge cases (pipeline=target, single-element pattern) | 15 min |\n| P3 | API + WebSocket integration tests | needs API impl first |\n\nP1+P2 close the only real gaps in existing code. P3 blocks on features not yet built.",
+        "level": 2
+      }
+    ],
+    "codeBlocks": [
+      {
+        "language": "python",
+        "code": "# tests/core/test_engine.py\ndef test_demand_pattern_wraps_around():\n    \"\"\"Rounds beyond demand_pattern length reuse from start via modulo.\"\"\"\n    engine = GameEngine()\n    config = GameConfig(\n        num_rounds=6,\n        demand_pattern=[4, 8],  # len=2, so round 3 wraps → 4, round 4 → 8\n    )\n    state = engine.create_game(config)\n    state = engine.start_game(state)\n\n    demands = []\n    for _ in range(6):\n        # force AI/human orders so round completes\n        for role in state.players:\n            state = engine.submit_order(state, role, 4)\n        prev_round = state.current_round\n        state = engine.process_round(state)\n        # verify state advances; actual demand assertion requires exposing it\n\n    assert state.current_round == 6\n    # Cost profile should reflect alternating demand, not crash"
+      },
+      {
+        "language": "python",
+        "code": "# tests/core/test_engine.py\ndef test_submit_order_unknown_role_raises():\n    engine = GameEngine()\n    state = engine.create_game()\n    state = engine.start_game(state)\n    with pytest.raises((KeyError, ValueError)):\n        engine.submit_order(state, \"NOT_A_ROLE\", 4)  # type: ignore\n\ndef test_submit_order_negative_quantity_raises():\n    engine = GameEngine()\n    state = engine.create_game()\n    state = engine.start_game(state)\n    with pytest.raises((ValueError, AssertionError)):\n        engine.submit_order(state, PlayerRole.RETAILER, -1)\n\ndef test_submit_order_on_finished_game_raises():\n    engine = GameEngine()\n    config = GameConfig(num_rounds=1)\n    state = engine.create_game(config)\n    state = engine.start_game(state)\n    for role in list(state.players):\n        state = engine.submit_order(state, role, 4)\n    state = engine.process_round(state)\n    assert state.phase == GamePhase.FINISHED\n    with pytest.raises((ValueError, RuntimeError)):\n        engine.submit_order(state, PlayerRole.RETAILER, 4)"
+      },
+      {
+        "language": "python",
+        "code": "def test_start_game_twice_raises():\n    engine = GameEngine()\n    state = engine.create_game()\n    state = engine.start_game(state)\n    with pytest.raises((ValueError, RuntimeError)):\n        engine.start_game(state)  # already ACTIVE"
+      },
+      {
+        "language": "python",
+        "code": "def test_get_visible_state_factory_has_no_upstream():\n    engine = GameEngine()\n    state = engine.create_game()\n    visible = engine.get_visible_state(state, PlayerRole.FACTORY)\n    assert \"upstream_order\" not in visible or visible.get(\"upstream_order\") is None"
+      },
+      {
+        "language": "python",
+        "code": "# tests/core/test_order_processor.py (new file)\nimport pytest\nfrom core.engine.order_processor import advance_shipments, fulfill_orders, accrue_costs\nfrom core.models.game import GameState, GameConfig, PlayerState\nfrom core.models.player import PlayerRole\n\ndef make_state(**overrides) -> GameState:\n    \"\"\"Helper: minimal GameState for order_processor unit tests.\"\"\"\n    ...  # build minimal valid GameState with overrides applied\n\ndef test_fulfill_orders_zero_inventory_zero_backlog():\n    state = make_state(inventory=0, backlog=0, incoming_order=4)\n    result = fulfill_orders(state, customer_demand=4)\n    # Nothing to ship; backlog accumulates\n    assert result.players[PlayerRole.RETAILER].backlog == 4\n\ndef test_fulfill_orders_exact_match():\n    state = make_state(inventory=4, backlog=0)\n    result = fulfill_orders(state, customer_demand=4)\n    assert result.players[PlayerRole.RETAILER].inventory == 0\n    assert result.players[PlayerRole.RETAILER].backlog == 0\n\ndef test_advance_shipments_shipping_delay_longer_than_game():\n    config = GameConfig(num_rounds=2, shipping_delay=5)\n    state = make_state(config=config)\n    # Shipments in pipeline should never arrive within game length\n    result = advance_shipments(state)\n    # All incoming_shipments counters still > 0\n    for player in result.players.values():\n        for s in player.incoming_shipments:\n            assert s.arrives_in_rounds > 0\n\ndef test_accrue_costs_zero_inventory_zero_backlog():\n    state = make_state(inventory=0, backlog=0)\n    before = {r: p.total_cost for r, p in state.players.items()}\n    result = accrue_costs(state)\n    after = {r: p.total_cost for r, p in result.players.items()}\n    assert before == after  # no cost delta"
+      },
+      {
+        "language": "python",
+        "code": "# tests/core/test_ai_players.py additions\ndef test_order_up_to_pipeline_exactly_at_target():\n    \"\"\"No order placed when pipeline + inventory already meets target.\"\"\"\n    ai = OrderUpToAI(PlayerRole.RETAILER)\n    state = make_state_with(inventory=12, pipeline=4)  # 12+4 = target=16\n    order = ai.decide_order(state)\n    assert order == 0\n\ndef test_order_up_to_single_element_demand_pattern():\n    config = GameConfig(demand_pattern=[4])\n    engine = GameEngine()\n    state = engine.create_game(config, ai_roles={PlayerRole.RETAILER})\n    state = engine.start_game(state)\n    # Should not crash on repeated single element\n    for _ in range(5):\n        for role in state.players:\n            state = engine.submit_order(state, role, 4)\n        state = engine.process_round(state)"
+      },
+      {
+        "language": "python",
+        "code": "# tests/integration/test_api.py\nimport pytest\nfrom httpx import AsyncClient\nfrom core.api.app import app  # doesn't exist yet\n\n@pytest.mark.asyncio\nasync def test_create_game_endpoint():\n    async with AsyncClient(app=app, base_url=\"http://test\") as client:\n        resp = await client.post(\"/games\", json={})\n    assert resp.status_code == 201\n    assert \"game_id\" in resp.json()\n\n@pytest.mark.asyncio\nasync def test_submit_order_endpoint_invalid_role_returns_422():\n    async with AsyncClient(app=app, base_url=\"http://test\") as client:\n        resp = await client.post(\"/games/abc/orders\", json={\"role\": \"INVALID\", \"quantity\": 4})\n    assert resp.status_code == 422"
+      },
+      {
+        "language": "python",
+        "code": "# tests/integration/test_websocket.py\nimport pytest\nfrom httpx_ws import aconnect_ws\nfrom core.api.app import app\n\n@pytest.mark.asyncio\nasync def test_websocket_connects_and_receives_state():\n    async with aconnect_ws(\"/ws/games/test-id\", app) as ws:\n        msg = await ws.receive_json()\n        assert \"phase\" in msg\n\n@pytest.mark.asyncio\nasync def test_websocket_disconnects_gracefully():\n    # Client closes mid-game — server should not crash\n    ..."
+      }
+    ]
+  },
+  "durationMs": 204431,
+  "model": "sonnet",
+  "sandboxMode": "permissive",
+  "workerType": "testgaps",
+  "timestamp": "2026-06-02T13:07:12.185Z",
+  "executionId": "testgaps_1780405427754_t2sgqu"
+}

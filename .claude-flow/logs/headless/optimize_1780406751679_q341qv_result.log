@@ -1,0 +1,109 @@
+[2026-06-02T13:27:11.404Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "No frontend exists yet (no Svelte/TS files) — analysis covers Python core engine only. Here's what I found:\n\n---\n\n## Performance Analysis: `core/`\n\n### 1. Memory Leak — `incoming_orders` grows unbounded\n\n`order_processor.py:72` appends to `incoming_orders` every round. Nothing ever reads or drains it. After 26 rounds: 26 ints × 4 players sitting in memory. Sets a bad pattern for 100-round variants.\n\n```python\n# order_processor.py — place_orders()\nupstream_ps.incoming_orders.append(order_qty)  # accumulated, never consumed\n```\n\n**Fix:** drain after reading, or remove the field if unused. If it's for history/reporting, cap it:\n```python\nupstream_ps.incoming_orders.append(order_qty)\nif len(upstream_ps.incoming_orders) > state.config.num_rounds:\n    upstream_ps.incoming_orders.pop(0)\n```\nOr just remove `incoming_orders` entirely — `orders_this_round` already tracks current-round orders; `last_order` on `PlayerState` tracks the last.\n\n---\n\n### 2. Redundant Computation — `is_round_complete` rebuilds set every call\n\n`game.py:56` — the active roles set never changes mid-game yet gets rebuilt on every check:\n\n```python\ndef is_round_complete(self) -> bool:\n    active_roles = {role for role, ps in self.players.items() if not ps.is_ai}  # rebuilt every call\n    return active_roles.issubset(self.orders_this_round.keys())\n```\n\n**Fix:** cache at game start (or use `functools.cached_property` — but Pydantic v2 BaseModel needs `model_config = ConfigDict(arbitrary_types_allowed=True)` or store as regular field):\n\n```python\n# In GameState or GameEngine.create_game(), store once:\nactive_human_roles: frozenset[PlayerRole] = Field(default_factory=frozenset)\n\n# Then:\ndef is_round_complete(self) -> bool:\n    return self.active_human_roles.issubset(self.orders_this_round.keys())\n```\n\n---\n\n### 3. Pydantic Object Thrash — `advance_shipments` recreates validated models every round\n\n`order_processor.py:9-13` — every round, ALL in-flight shipments are discarded and recreated as new Pydantic instances (with full validation) just to decrement one counter:\n\n```python\nps.incoming_shipments = [\n    IncomingShipment(quantity=s.quantity, arrives_in_rounds=s.arrives_in_rounds - 1)\n    for s in ps.incoming_shipments\n    if s.arrives_in_rounds > 1\n]\n```\n\nWith `shipping_delay=2`, small now. With longer pipelines in Sustainable Worlds / World Disasters variants, this scales O(delay × players × rounds).\n\n**Fix:** use `model_construct` (skips validators, safe here since we control the decrement):\n```python\nps.incoming_shipments = [\n    IncomingShipment.model_construct(\n        quantity=s.quantity,\n        arrives_in_rounds=s.arrives_in_rounds - 1,\n    )\n    for s in ps.incoming_shipments\n    if s.arrives_in_rounds > 1\n]\n```\n\nAlso: two passes over the list (line 7 `sum(...if == 1)`, then line 9-13 `filter > 1`). Combine into one:\n\n```python\narrived = 0\nremaining = []\nfor s in ps.incoming_shipments:\n    if s.arrives_in_rounds == 1:\n        arrived += s.quantity\n    else:\n        remaining.append(\n            IncomingShipment.model_construct(\n                quantity=s.quantity, arrives_in_rounds=s.arrives_in_rounds - 1\n            )\n        )\nps.inventory += arrived\nps.incoming_shipments = remaining\n```\n\n---\n\n### 4. Import Inside Loop — `game_engine.py:32`\n\n```python\nfor role in ROLE_ORDER:\n    from core.models import IncomingShipment  # ← inside loop, 4 iterations\n```\n\nPython caches modules but still does a dict lookup each iteration. Move to top-level import.\n\n---\n\n### 5. `get_visible_state` — `model_dump()` on every WebSocket tick\n\n`game_engine.py:95` — when multiplayer is live, this fires per-player per-tick:\n```python\n\"incoming_shipments\": [s.model_dump() for s in ps.incoming_shipments],\n```\n\n**Caching opportunity:** shipments only change when `advance_shipments` or `fulfill_orders` runs. If `GameState` tracked a `_dirty` flag per player, the serialized view could be cached between rounds. Low priority now; high priority once WebSocket fanout is wired.\n\n---\n\n### 6. Logic Bug (not perf, but related) — `round_cost()` uses hardcoded constants\n\n`game.py:41-42` uses module-level `HOLDING_COST_PER_UNIT` / `BACKLOG_COST_PER_UNIT` while `accrue_costs` uses `state.config.holding_cost` / `state.config.backlog_cost`. If config overrides the defaults, `round_cost()` returns wrong values.\n\n---\n\n### Priority order\n\n| # | Issue | Impact | Effort |\n|---|-------|--------|--------|\n| 1 | `incoming_orders` memory leak | Medium (unbounded growth) | Low — delete or drain |\n| 2 | `advance_shipments` two-pass + Pydantic thrash | Medium (scales with variant complexity) | Low |\n| 3 | `is_round_complete` set rebuild | Low now, high under load | Low |\n| 4 | Import inside loop | Negligible | Trivial |\n| 5 | `get_visible_state` caching | Low now, high at WS scale | Medium |\n| 6 | `round_cost()` constant mismatch | Bug, not perf | Trivial |\n\nNo N+1 DB patterns yet — no DB layer exists. Watch for it when PostgreSQL is added: loading `PlayerState` rows then querying shipments per-player in a loop will be the first N+1 to hit.\n",
+  "parsedOutput": {
+    "sections": [
+      {
+        "title": "Performance Analysis: `core/`",
+        "content": "\n",
+        "level": 2
+      },
+      {
+        "title": "1. Memory Leak — `incoming_orders` grows unbounded",
+        "content": "\n`order_processor.py:72` appends to `incoming_orders` every round. Nothing ever reads or drains it. After 26 rounds: 26 ints × 4 players sitting in memory. Sets a bad pattern for 100-round variants.\n\n```python\n",
+        "level": 3
+      },
+      {
+        "title": "order_processor.py — place_orders()",
+        "content": "upstream_ps.incoming_orders.append(order_qty)  # accumulated, never consumed\n```\n\n**Fix:** drain after reading, or remove the field if unused. If it's for history/reporting, cap it:\n```python\nupstream_ps.incoming_orders.append(order_qty)\nif len(upstream_ps.incoming_orders) > state.config.num_rounds:\n    upstream_ps.incoming_orders.pop(0)\n```\nOr just remove `incoming_orders` entirely — `orders_this_round` already tracks current-round orders; `last_order` on `PlayerState` tracks the last.\n\n---\n\n",
+        "level": 1
+      },
+      {
+        "title": "2. Redundant Computation — `is_round_complete` rebuilds set every call",
+        "content": "\n`game.py:56` — the active roles set never changes mid-game yet gets rebuilt on every check:\n\n```python\ndef is_round_complete(self) -> bool:\n    active_roles = {role for role, ps in self.players.items() if not ps.is_ai}  # rebuilt every call\n    return active_roles.issubset(self.orders_this_round.keys())\n```\n\n**Fix:** cache at game start (or use `functools.cached_property` — but Pydantic v2 BaseModel needs `model_config = ConfigDict(arbitrary_types_allowed=True)` or store as regular field):\n\n```python\n",
+        "level": 3
+      },
+      {
+        "title": "In GameState or GameEngine.create_game(), store once:",
+        "content": "active_human_roles: frozenset[PlayerRole] = Field(default_factory=frozenset)\n\n",
+        "level": 1
+      },
+      {
+        "title": "Then:",
+        "content": "def is_round_complete(self) -> bool:\n    return self.active_human_roles.issubset(self.orders_this_round.keys())\n```\n\n---\n\n",
+        "level": 1
+      },
+      {
+        "title": "3. Pydantic Object Thrash — `advance_shipments` recreates validated models every round",
+        "content": "\n`order_processor.py:9-13` — every round, ALL in-flight shipments are discarded and recreated as new Pydantic instances (with full validation) just to decrement one counter:\n\n```python\nps.incoming_shipments = [\n    IncomingShipment(quantity=s.quantity, arrives_in_rounds=s.arrives_in_rounds - 1)\n    for s in ps.incoming_shipments\n    if s.arrives_in_rounds > 1\n]\n```\n\nWith `shipping_delay=2`, small now. With longer pipelines in Sustainable Worlds / World Disasters variants, this scales O(delay × players × rounds).\n\n**Fix:** use `model_construct` (skips validators, safe here since we control the decrement):\n```python\nps.incoming_shipments = [\n    IncomingShipment.model_construct(\n        quantity=s.quantity,\n        arrives_in_rounds=s.arrives_in_rounds - 1,\n    )\n    for s in ps.incoming_shipments\n    if s.arrives_in_rounds > 1\n]\n```\n\nAlso: two passes over the list (line 7 `sum(...if == 1)`, then line 9-13 `filter > 1`). Combine into one:\n\n```python\narrived = 0\nremaining = []\nfor s in ps.incoming_shipments:\n    if s.arrives_in_rounds == 1:\n        arrived += s.quantity\n    else:\n        remaining.append(\n            IncomingShipment.model_construct(\n                quantity=s.quantity, arrives_in_rounds=s.arrives_in_rounds - 1\n            )\n        )\nps.inventory += arrived\nps.incoming_shipments = remaining\n```\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "4. Import Inside Loop — `game_engine.py:32`",
+        "content": "\n```python\nfor role in ROLE_ORDER:\n    from core.models import IncomingShipment  # ← inside loop, 4 iterations\n```\n\nPython caches modules but still does a dict lookup each iteration. Move to top-level import.\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "5. `get_visible_state` — `model_dump()` on every WebSocket tick",
+        "content": "\n`game_engine.py:95` — when multiplayer is live, this fires per-player per-tick:\n```python\n\"incoming_shipments\": [s.model_dump() for s in ps.incoming_shipments],\n```\n\n**Caching opportunity:** shipments only change when `advance_shipments` or `fulfill_orders` runs. If `GameState` tracked a `_dirty` flag per player, the serialized view could be cached between rounds. Low priority now; high priority once WebSocket fanout is wired.\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "6. Logic Bug (not perf, but related) — `round_cost()` uses hardcoded constants",
+        "content": "\n`game.py:41-42` uses module-level `HOLDING_COST_PER_UNIT` / `BACKLOG_COST_PER_UNIT` while `accrue_costs` uses `state.config.holding_cost` / `state.config.backlog_cost`. If config overrides the defaults, `round_cost()` returns wrong values.\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "Priority order",
+        "content": "| # | Issue | Impact | Effort |\n|---|-------|--------|--------|\n| 1 | `incoming_orders` memory leak | Medium (unbounded growth) | Low — delete or drain |\n| 2 | `advance_shipments` two-pass + Pydantic thrash | Medium (scales with variant complexity) | Low |\n| 3 | `is_round_complete` set rebuild | Low now, high under load | Low |\n| 4 | Import inside loop | Negligible | Trivial |\n| 5 | `get_visible_state` caching | Low now, high at WS scale | Medium |\n| 6 | `round_cost()` constant mismatch | Bug, not perf | Trivial |\n\nNo N+1 DB patterns yet — no DB layer exists. Watch for it when PostgreSQL is added: loading `PlayerState` rows then querying shipments per-player in a loop will be the first N+1 to hit.",
+        "level": 3
+      }
+    ],
+    "codeBlocks": [
+      {
+        "language": "python",
+        "code": "# order_processor.py — place_orders()\nupstream_ps.incoming_orders.append(order_qty)  # accumulated, never consumed"
+      },
+      {
+        "language": "python",
+        "code": "upstream_ps.incoming_orders.append(order_qty)\nif len(upstream_ps.incoming_orders) > state.config.num_rounds:\n    upstream_ps.incoming_orders.pop(0)"
+      },
+      {
+        "language": "python",
+        "code": "def is_round_complete(self) -> bool:\n    active_roles = {role for role, ps in self.players.items() if not ps.is_ai}  # rebuilt every call\n    return active_roles.issubset(self.orders_this_round.keys())"
+      },
+      {
+        "language": "python",
+        "code": "# In GameState or GameEngine.create_game(), store once:\nactive_human_roles: frozenset[PlayerRole] = Field(default_factory=frozenset)\n\n# Then:\ndef is_round_complete(self) -> bool:\n    return self.active_human_roles.issubset(self.orders_this_round.keys())"
+      },
+      {
+        "language": "python",
+        "code": "ps.incoming_shipments = [\n    IncomingShipment(quantity=s.quantity, arrives_in_rounds=s.arrives_in_rounds - 1)\n    for s in ps.incoming_shipments\n    if s.arrives_in_rounds > 1\n]"
+      },
+      {
+        "language": "python",
+        "code": "ps.incoming_shipments = [\n    IncomingShipment.model_construct(\n        quantity=s.quantity,\n        arrives_in_rounds=s.arrives_in_rounds - 1,\n    )\n    for s in ps.incoming_shipments\n    if s.arrives_in_rounds > 1\n]"
+      },
+      {
+        "language": "python",
+        "code": "arrived = 0\nremaining = []\nfor s in ps.incoming_shipments:\n    if s.arrives_in_rounds == 1:\n        arrived += s.quantity\n    else:\n        remaining.append(\n            IncomingShipment.model_construct(\n                quantity=s.quantity, arrives_in_rounds=s.arrives_in_rounds - 1\n            )\n        )\nps.inventory += arrived\nps.incoming_shipments = remaining"
+      },
+      {
+        "language": "python",
+        "code": "for role in ROLE_ORDER:\n    from core.models import IncomingShipment  # ← inside loop, 4 iterations"
+      },
+      {
+        "language": "python",
+        "code": "\"incoming_shipments\": [s.model_dump() for s in ps.incoming_shipments],"
+      }
+    ]
+  },
+  "durationMs": 79724,
+  "model": "sonnet",
+  "sandboxMode": "permissive",
+  "workerType": "optimize",
+  "timestamp": "2026-06-02T13:27:11.403Z",
+  "executionId": "optimize_1780406751679_q341qv"
+}

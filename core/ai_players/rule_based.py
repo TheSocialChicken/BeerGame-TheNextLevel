@@ -1,4 +1,5 @@
 from core.models import GameState, PlayerRole
+
 from .base import BaseAIPlayer
 
 TARGET_INVENTORY = 12

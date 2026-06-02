@@ -1,4 +1,4 @@
-from core.models import GameState, PlayerState, PlayerRole, IncomingShipment, ROLE_ORDER
+from core.models import ROLE_ORDER, GameState, IncomingShipment, PlayerRole
 
 
 def advance_shipments(state: GameState) -> GameState:

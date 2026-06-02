@@ -1,9 +1,10 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+
+from backend.services.connection_manager import manager
+from backend.services.game_store import game_store
 from core.engine.game_engine import GameEngine
 from core.models import GameConfig, GamePhase, PlayerRole
-from backend.services.game_store import game_store
-from backend.services.connection_manager import manager
 
 router = APIRouter(prefix="/games", tags=["games"])
 engine = GameEngine()

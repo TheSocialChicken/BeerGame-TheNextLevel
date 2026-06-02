@@ -1,6 +1,8 @@
 from core.models import GameConfig
 
-CLASSIC_DESCRIPTION: str = "Classic Beer Game — 4-player supply chain, 26 rounds, demand step change"
+CLASSIC_DESCRIPTION: str = (
+    "Classic Beer Game — 4-player supply chain, 26 rounds, demand step change"
+)
 
 CLASSIC_CONFIG = GameConfig(
     num_rounds=26,

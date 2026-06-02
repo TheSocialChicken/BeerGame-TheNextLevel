@@ -1,0 +1,57 @@
+[2026-06-02T12:58:03.653Z] RESULT
+============================================================
+{
+  "success": true,
+  "output": "**SECURITY AUDIT REPORT**\n\nCodebase analyzed. Found 1 critical, 1 medium, and several best-practice gaps.\n\n```json\n{\n  \"vulnerabilities\": [\n    {\n      \"severity\": \"critical\",\n      \"file\": \".github/workflows/deploy.yml\",\n      \"line\": 81,\n      \"description\": \"SSH host key checking disabled (ANSIBLE_HOST_KEY_CHECKING: 'false'). Enables MITM attacks on deployment SSH connections.\"\n    },\n    {\n      \"severity\": \"medium\",\n      \"file\": \".github/workflows/deploy.yml\",\n      \"line\": 80,\n      \"description\": \"KEEPASS_MASTER_PASSWORD exposed as environment variable. Could be logged or captured. Use secure secret injection only.\"\n    },\n    {\n      \"severity\": \"low\",\n      \"file\": \".github/workflows/ci.yml\",\n      \"line\": 42,\n      \"description\": \"Codecov integration uploads coverage reports from PRs. Coverage data could leak code structure to external service.\"\n    }\n  ],\n  \"riskScore\": 28,\n  \"recommendations\": [\n    \"CRITICAL: Fix deploy.yml line 81 — change to ANSIBLE_HOST_KEY_CHECKING: 'true' and add server fingerprint to known_hosts\",\n    \"Do NOT pass KEEPASS_MASTER_PASSWORD via env vars in GitHub Actions. Use Ansible vault encryption instead.\",\n    \"Implement API authentication/authorization layer before production (JWT or OAuth)\",\n    \"Add security headers once frontend is built: CSP, X-Frame-Options, Strict-Transport-Security, X-Content-Type-Options\",\n    \"Configure CORS with explicit origin whitelist\",\n    \"Add SAST scanning to CI (e.g., Bandit for Python, npm audit for Node)\",\n    \"Enable GitHub secret scanning to prevent accidental commits\",\n    \"Implement rate limiting on all API endpoints\",\n    \"Add audit logging for security-relevant events (auth, deployments, config changes)\",\n    \"Rotate all secrets in KeePass vault monthly\"\n  ],\n  \"coverage\": {\n    \"hardcodedSecrets\": \"PASS\",\n    \"sqlInjection\": \"PASS (using Pydantic, no raw SQL)\",\n    \"xssVulnerabilities\": \"PASS (backend; frontend not yet implemented)\",\n    \"dependencyVulnerabilities\": \"PASS (Dependabot configured)\",\n    \"authenticationAuthorization\": \"NOT YET IMPLEMENTED (API layer missing)\",\n    \"secretsManagement\": \"PARTIAL (KeePass configured but exposed in CI)\",\n    \"inputValidation\": \"PASS (Pydantic Field constraints in place)\",\n    \"loggingDataExposure\": \"PASS (no secrets logged)\"\n  }\n}\n```\n\n**Key Findings**\n\n✅ **Good:**\n- Strict input validation via Pydantic with Field constraints (`ge=0`)\n- No hardcoded secrets in codebase\n- Type hints on all functions\n- 80%+ test coverage requirement enforced\n- Dependabot + Codecov integration\n- No SQL injection risk (no raw SQL)\n\n⚠️ **Critical:**\nSSH key checking disabled in deploy — **fix immediately** or redeploy will be vulnerable to MITM. Change line 81 to `'true'` and ensure server SSH key is in known_hosts before first deploy.\n\n❌ **Not Yet Implemented:**\n- API authentication/authorization layer\n- Security headers (CSP, HSTS, etc.)\n- Rate limiting\n- SAST scanning in CI\n- Audit logging\n\nCodebase is early-stage and follows good practices overall. Risk score 28/100 reflects solid foundation + 1 critical misconfiguration to fix.\n",
+  "parsedOutput": {
+    "vulnerabilities": [
+      {
+        "severity": "critical",
+        "file": ".github/workflows/deploy.yml",
+        "line": 81,
+        "description": "SSH host key checking disabled (ANSIBLE_HOST_KEY_CHECKING: 'false'). Enables MITM attacks on deployment SSH connections."
+      },
+      {
+        "severity": "medium",
+        "file": ".github/workflows/deploy.yml",
+        "line": 80,
+        "description": "KEEPASS_MASTER_PASSWORD exposed as environment variable. Could be logged or captured. Use secure secret injection only."
+      },
+      {
+        "severity": "low",
+        "file": ".github/workflows/ci.yml",
+        "line": 42,
+        "description": "Codecov integration uploads coverage reports from PRs. Coverage data could leak code structure to external service."
+      }
+    ],
+    "riskScore": 28,
+    "recommendations": [
+      "CRITICAL: Fix deploy.yml line 81 — change to ANSIBLE_HOST_KEY_CHECKING: 'true' and add server fingerprint to known_hosts",
+      "Do NOT pass KEEPASS_MASTER_PASSWORD via env vars in GitHub Actions. Use Ansible vault encryption instead.",
+      "Implement API authentication/authorization layer before production (JWT or OAuth)",
+      "Add security headers once frontend is built: CSP, X-Frame-Options, Strict-Transport-Security, X-Content-Type-Options",
+      "Configure CORS with explicit origin whitelist",
+      "Add SAST scanning to CI (e.g., Bandit for Python, npm audit for Node)",
+      "Enable GitHub secret scanning to prevent accidental commits",
+      "Implement rate limiting on all API endpoints",
+      "Add audit logging for security-relevant events (auth, deployments, config changes)",
+      "Rotate all secrets in KeePass vault monthly"
+    ],
+    "coverage": {
+      "hardcodedSecrets": "PASS",
+      "sqlInjection": "PASS (using Pydantic, no raw SQL)",
+      "xssVulnerabilities": "PASS (backend; frontend not yet implemented)",
+      "dependencyVulnerabilities": "PASS (Dependabot configured)",
+      "authenticationAuthorization": "NOT YET IMPLEMENTED (API layer missing)",
+      "secretsManagement": "PARTIAL (KeePass configured but exposed in CI)",
+      "inputValidation": "PASS (Pydantic Field constraints in place)",
+      "loggingDataExposure": "PASS (no secrets logged)"
+    }
+  },
+  "durationMs": 118049,
+  "model": "haiku",
+  "sandboxMode": "strict",
+  "workerType": "audit",
+  "timestamp": "2026-06-02T12:58:03.653Z",
+  "executionId": "audit_1780404965604_ssdmd6"
+}
