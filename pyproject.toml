@@ -26,7 +26,14 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "--cov=core --cov-report=term-missing --cov-fail-under=80"
+addopts = "--cov=core --cov-report=term-missing --cov-fail-under=80 --no-cov-on-fail"
+
+[tool.coverage.run]
+omit = ["*/tests/*"]
+data_file = ".coverage"
+
+[tool.coverage.report]
+omit = ["*/tests/*"]
 
 [tool.ruff]
 target-version = "py312"
