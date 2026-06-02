@@ -44,8 +44,8 @@ providers:
     type: ollama
     host: http://100.95.236.57:11434  # Fedora laptop via Tailscale
     models:
-      - qwen2.5-coder:7b    # Fast local coding
-      - llama3.2:3b          # Lightweight general tasks
+      - nemotron3:33b        # Heavy local coding/reasoning
+      - deepseek-r1:7b       # Local reasoning/planning
     use_for: [frequent_tasks, sensitive_data, offline_capable]
 
 # ─────────────────────────────────────────────

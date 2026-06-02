@@ -33,7 +33,7 @@
         "name": "local",
         "type": "ollama",
         "host": "http://100.95.236.57:11434",
-        "models": ["llama3.1:8b", "deepseek-r1:7b"],
+        "models": ["nemotron3:33b", "deepseek-r1:7b"],
         "useFor": ["frequent_tasks", "sensitive_data", "offline_capable"]
       }
     ]
