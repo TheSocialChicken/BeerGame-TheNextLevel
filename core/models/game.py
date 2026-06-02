@@ -21,9 +21,7 @@ class GameConfig(BaseModel):
     num_rounds: int = Field(default=26, ge=1, le=100)
     initial_inventory: int = Field(default=12, ge=0)
     initial_backlog: int = Field(default=0, ge=0)
-    demand_pattern: list[int] = Field(
-        default_factory=lambda: [4] * 4 + [8] * 22
-    )
+    demand_pattern: list[int] = Field(default_factory=lambda: [4] * 4 + [8] * 22)
     holding_cost: float = Field(default=HOLDING_COST_PER_UNIT, ge=0)
     backlog_cost: float = Field(default=BACKLOG_COST_PER_UNIT, ge=0)
     shipping_delay: int = Field(default=SHIPPING_DELAY, ge=1)

@@ -42,12 +42,11 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, role: str):
                 try:
                     state = engine.submit_order(state, player_role, int(quantity))
                     await game_store.save(state)
-                    await websocket.send_json(
-                        {"event": "order_accepted", "quantity": quantity}
-                    )
+                    await websocket.send_json({"event": "order_accepted", "quantity": quantity})
 
                     if state.is_round_complete():
                         from core.ai_players.rule_based import OrderUpToAI
+
                         for r, ps in state.players.items():
                             if ps.is_ai and r not in state.orders_this_round:
                                 ai_qty = OrderUpToAI(r).decide_order(state)
@@ -56,13 +55,17 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, role: str):
                         await game_store.save(state)
 
                         from core.models import GamePhase
+
                         event = "round_complete" if state.phase == GamePhase.ACTIVE else "game_over"
-                        await manager.broadcast(game_id, {
-                            "event": event,
-                            "round": state.current_round,
-                            "phase": state.phase,
-                            "total_cost": state.total_cost(),
-                        })
+                        await manager.broadcast(
+                            game_id,
+                            {
+                                "event": event,
+                                "round": state.current_round,
+                                "phase": state.phase,
+                                "total_cost": state.total_cost(),
+                            },
+                        )
 
                 except ValueError as e:
                     await websocket.send_json({"event": "error", "message": str(e)})

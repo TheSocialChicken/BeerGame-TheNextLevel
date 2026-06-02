@@ -1,0 +1,16 @@
+> from enum import Enum
+  
+  
+> class PlayerRole(str, Enum):
+>     RETAILER = "retailer"
+>     WHOLESALER = "wholesaler"
+>     DISTRIBUTOR = "distributor"
+>     FACTORY = "factory"
+  
+  
+> ROLE_ORDER: list[PlayerRole] = [
+>     PlayerRole.RETAILER,
+>     PlayerRole.WHOLESALER,
+>     PlayerRole.DISTRIBUTOR,
+>     PlayerRole.FACTORY,
+> ]

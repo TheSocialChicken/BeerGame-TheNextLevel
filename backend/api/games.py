@@ -65,6 +65,7 @@ async def submit_order(game_id: str, body: SubmitOrderRequest):
     if state.is_round_complete():
         # Fill in AI orders before processing
         from core.ai_players.rule_based import OrderUpToAI
+
         for role, ps in state.players.items():
             if ps.is_ai and role not in state.orders_this_round:
                 ai = OrderUpToAI(role)

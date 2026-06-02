@@ -84,9 +84,6 @@ def place_orders(state: GameState) -> GameState:
 
 def accrue_costs(state: GameState) -> GameState:
     for ps in state.players.values():
-        cost = (
-            ps.inventory * state.config.holding_cost
-            + ps.backlog * state.config.backlog_cost
-        )
+        cost = ps.inventory * state.config.holding_cost + ps.backlog * state.config.backlog_cost
         ps.cumulative_cost += cost
     return state

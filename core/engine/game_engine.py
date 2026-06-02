@@ -32,6 +32,7 @@ class GameEngine:
             )
             # Pre-fill shipment pipeline (standard Beer Game setup)
             from core.models import IncomingShipment
+
             for delay in range(1, cfg.shipping_delay + 1):
                 ps.incoming_shipments.append(
                     IncomingShipment(quantity=cfg.initial_inventory // 2, arrives_in_rounds=delay)
