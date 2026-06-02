@@ -35,14 +35,14 @@ providers:
   cost_saving:
     type: openrouter
     models:
-      - deepseek/deepseek-coder-v2     # Strong coding, near free
-      - qwen/qwen-2.5-coder-32b-instruct  # Strong coding, free tier
-      - perplexity/sonar               # Research with web search
+      - nvidia/nemotron-3-super-120b-a12b:free   # Strong coding, free
+      - meta-llama/llama-3.3-70b-instruct:free   # General tasks, free
+      - google/gemma-4-31b-it:free               # Research/reasoning, free
     use_for: [routine_coding, research, test_generation]
 
   local:
     type: ollama
-    host: http://proxmox-server:11434  # Replace with actual Proxmox IP
+    host: http://100.95.236.57:11434  # Fedora laptop via Tailscale
     models:
       - qwen2.5-coder:7b    # Fast local coding
       - llama3.2:3b          # Lightweight general tasks
