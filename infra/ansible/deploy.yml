@@ -4,19 +4,19 @@
 #
 # Variables (passed via -e):
 #   variant:     which game variant to deploy (or "all")
-#   environment: staging | production
+#   deploy_env:  staging | production
 #   git_ref:     git SHA being deployed
 #
 # Secrets:
 #   KEEPASS_MASTER_PASSWORD: env var, used to unlock vault if needed
 
 - name: Deploy BeerGame variant(s)
-  hosts: "{{ environment }}"
+  hosts: "{{ deploy_env }}"
   become: true
   gather_facts: true
 
   vars:
-    environment: staging  # overridden at runtime via -e environment=production
+    deploy_env: staging  # overridden at runtime via -e deploy_env=production
     app_base_dir: /opt/beergame
     docker_compose_cmd: docker compose
     variants_all:
@@ -66,7 +66,7 @@
   post_tasks:
     - name: Verify Traefik is routing correctly
       ansible.builtin.uri:
-        url: "https://{{ 'staging-' if environment == 'staging' else '' }}{{ current_variant }}.valuechainhackers.xyz/health"
+        url: "https://{{ 'staging-' if deploy_env == 'staging' else '' }}{{ current_variant }}.valuechainhackers.xyz/health"
         status_code: 200
       loop: "{{ variants_to_deploy }}"
       loop_control:
@@ -77,5 +77,5 @@
 
     - name: Report deploy status
       ansible.builtin.debug:
-        msg: "Deployed {{ variants_to_deploy | join(', ') }} to {{ environment }} at {{ git_ref }}"
+        msg: "Deployed {{ variants_to_deploy | join(', ') }} to {{ deploy_env }} at {{ git_ref }}"
       tags: [verify]
