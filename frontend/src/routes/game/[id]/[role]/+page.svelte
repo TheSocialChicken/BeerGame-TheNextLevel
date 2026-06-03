@@ -5,10 +5,10 @@
 	import { getState, submitOrder, startGame, type GameState } from '$lib/api';
 	import { GameSocket } from '$lib/websocket';
 
-	const gameId = page.params.id;
-	const role   = page.params.role;
+	const gameId = page.params.id!;
+	const role   = page.params.role!;
 
-	let state: GameState | null = $state(null);
+	let gameData: GameState | null = $state(null);
 	let orderQty   = $state('');
 	let statusMsg  = $state('Connecting...');
 	let gameOver   = $state(false);
@@ -16,7 +16,7 @@
 
 	async function loadState() {
 		try {
-			state = await getState(gameId, role);
+			gameData = await getState(gameId, role);
 		} catch (err) {
 			statusMsg = 'Error loading state: ' + err;
 		}
@@ -49,7 +49,7 @@
 	async function placeOrder() {
 		const qty = parseInt(orderQty, 10);
 		if (isNaN(qty) || qty < 0) { statusMsg = 'Enter valid quantity (≥ 0)'; return; }
-		if (state?.phase !== 'active')  { statusMsg = 'Game not active'; return; }
+		if (gameData?.phase !== 'active')  { statusMsg = 'Game not active'; return; }
 		try {
 			await submitOrder(gameId, role, qty);
 			socket?.sendOrder(qty);
@@ -73,35 +73,35 @@
 <div class="board">
 	<header>
 		<h1>Beer Game — <span class="role">{role}</span></h1>
-		<p>Round {state?.round ?? '–'} · Phase: <strong>{state?.phase ?? '–'}</strong></p>
+		<p>Round {gameData?.round ?? '–'} · Phase: <strong>{gameData?.phase ?? '–'}</strong></p>
 	</header>
 
 	{#if gameOver}
 		<div class="banner">🏁 {statusMsg}</div>
 	{/if}
 
-	{#if state}
+	{#if gameData}
 		<div class="stats">
-			<div class="stat"><span>Inventory</span><strong>{state.inventory}</strong></div>
-			<div class="stat"><span>Backlog</span><strong class:warn={state.backlog > 0}>{state.backlog}</strong></div>
-			<div class="stat"><span>Last Order</span><strong>{state.last_order}</strong></div>
-			<div class="stat"><span>Total Cost</span><strong>${state.cumulative_cost.toFixed(2)}</strong></div>
+			<div class="stat"><span>Inventory</span><strong>{gameData.inventory}</strong></div>
+			<div class="stat"><span>Backlog</span><strong class:warn={gameData.backlog > 0}>{gameData.backlog}</strong></div>
+			<div class="stat"><span>Last Order</span><strong>{gameData.last_order}</strong></div>
+			<div class="stat"><span>Total Cost</span><strong>${gameData.cumulative_cost.toFixed(2)}</strong></div>
 		</div>
 
-		{#if state.incoming_shipments.length > 0}
+		{#if gameData.incoming_shipments.length > 0}
 			<section>
 				<h3>Pipeline</h3>
 				<ul>
-					{#each state.incoming_shipments as s}
+					{#each gameData.incoming_shipments as s}
 						<li>{s.quantity} units arriving in {s.arrives_in_rounds} round{s.arrives_in_rounds !== 1 ? 's' : ''}</li>
 					{/each}
 				</ul>
 			</section>
 		{/if}
 
-		{#if state.phase === 'waiting'}
+		{#if gameData.phase === 'waiting'}
 			<button onclick={handleStart}>Start Game</button>
-		{:else if state.phase === 'active' && !gameOver}
+		{:else if gameData.phase === 'active' && !gameOver}
 			<section class="order-form">
 				<h3>Place Order</h3>
 				<input
