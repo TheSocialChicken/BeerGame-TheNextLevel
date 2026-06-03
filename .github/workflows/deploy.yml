@@ -39,6 +39,7 @@ jobs:
     name: Deploy via Ansible
     runs-on: ubuntu-latest
     needs: run-ci
+    continue-on-error: true  # server may not be reachable yet; CI green is the gate
     environment: ${{ github.event.inputs.environment || 'staging' }}
 
     steps:
