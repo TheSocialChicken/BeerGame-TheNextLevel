@@ -32,14 +32,10 @@ def build_report_data(state: GameState) -> dict:
                     if r in state.players
                 },
                 "inventory": {
-                    r.value: state.players[r].inventory
-                    for r in PlayerRole
-                    if r in state.players
+                    r.value: state.players[r].inventory for r in PlayerRole if r in state.players
                 },
                 "orders": {
-                    r.value: state.players[r].last_order
-                    for r in PlayerRole
-                    if r in state.players
+                    r.value: state.players[r].last_order for r in PlayerRole if r in state.players
                 },
             }
         )
@@ -51,9 +47,7 @@ def build_report_data(state: GameState) -> dict:
         "roles": roles,
         "round_history": round_history,
         "final_costs": {
-            r.value: state.players[r].cumulative_cost
-            for r in PlayerRole
-            if r in state.players
+            r.value: state.players[r].cumulative_cost for r in PlayerRole if r in state.players
         },
     }
 
@@ -74,9 +68,7 @@ def render_report(
 
     report_data = build_report_data(state)
 
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".json", delete=False, dir=output_dir
-    ) as fh:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, dir=output_dir) as fh:
         json.dump(report_data, fh)
         data_file = Path(fh.name)
 
@@ -98,9 +90,7 @@ def render_report(
         ]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            raise RuntimeError(
-                f"Quarto render failed for {fmt}:\n{result.stderr}"
-            )
+            raise RuntimeError(f"Quarto render failed for {fmt}:\n{result.stderr}")
         outputs.append(out_path)
 
     data_file.unlink(missing_ok=True)
