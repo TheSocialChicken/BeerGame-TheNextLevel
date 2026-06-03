@@ -25,6 +25,8 @@ class ConstantOrderAI(BaseAIPlayer):
     """Orders a fixed quantity every round — naive baseline."""
 
     def __init__(self, role: PlayerRole, quantity: int = 4):
+        if quantity < 0:
+            raise ValueError(f"ConstantOrderAI quantity must be >= 0, got {quantity}")
         super().__init__(role)
         self.quantity = quantity
 

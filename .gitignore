@@ -10,6 +10,8 @@ htmlcov/
 data/
 *.cover
 **/*.cover
+*,cover
+**/*,cover
 .claude-flow/
 claude-flow.config.export.json
 
