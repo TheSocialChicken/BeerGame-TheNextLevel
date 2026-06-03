@@ -1,11 +1,12 @@
+<svelte:options runes />
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { getState, submitOrder, startGame, type GameState } from '$lib/api';
 	import { GameSocket } from '$lib/websocket';
 
-	const gameId = $derived($page.params.id);
-	const role   = $derived($page.params.role);
+	const gameId = page.params.id;
+	const role   = page.params.role;
 
 	let state: GameState | null = $state(null);
 	let orderQty   = $state('');

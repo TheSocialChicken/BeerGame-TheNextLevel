@@ -16,6 +16,7 @@
   gather_facts: true
 
   vars:
+    environment: staging  # overridden at runtime via -e environment=production
     app_base_dir: /opt/beergame
     docker_compose_cmd: docker compose
     variants_all:

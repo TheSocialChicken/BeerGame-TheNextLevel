@@ -12,6 +12,7 @@
 
 - name: Extract SERVER_HOST from vault
   ansible.builtin.shell: |
+    set -o pipefail
     echo "$KEEPASS_MASTER_PASSWORD" | keepassxc-cli show -q -a Password \
       /tmp/beergame-vault/beergame.kdbx "GitHub/SERVER_HOST"
   environment:
@@ -22,6 +23,7 @@
 
 - name: Extract postgres password from vault
   ansible.builtin.shell: |
+    set -o pipefail
     echo "$KEEPASS_MASTER_PASSWORD" | keepassxc-cli show -q -a Password \
       /tmp/beergame-vault/beergame.kdbx "postgres/beergame"
   environment:
@@ -32,6 +34,7 @@
 
 - name: Extract redis token from vault
   ansible.builtin.shell: |
+    set -o pipefail
     echo "$KEEPASS_MASTER_PASSWORD" | keepassxc-cli show -q -a Password \
       /tmp/beergame-vault/beergame.kdbx "redis/beergame"
   environment:
