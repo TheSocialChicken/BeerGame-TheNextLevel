@@ -69,10 +69,28 @@ jobs:
           echo "variant=${VARIANT}" >> $GITHUB_OUTPUT
           echo "Deploying variant=${VARIANT} to environment=${ENV}"
 
+      - name: Generate dynamic inventory
+        run: |
+          cat > /tmp/inventory.ini << 'EOF'
+          [staging]
+          beergame-staging ansible_host=${{ secrets.SERVER_HOST }} ansible_user=deploy ansible_ssh_private_key_file=~/.ssh/id_rsa
+
+          [production]
+          beergame-prod ansible_host=${{ secrets.PROD_SERVER_HOST || secrets.SERVER_HOST }} ansible_user=deploy ansible_ssh_private_key_file=~/.ssh/id_rsa
+
+          [staging:vars]
+          environment=staging
+          domain_prefix=staging-
+
+          [production:vars]
+          environment=production
+          domain_prefix=
+          EOF
+
       - name: Run Ansible deploy playbook
         run: |
           ansible-playbook infra/ansible/deploy.yml \
-            -i infra/ansible/inventory/${{ steps.env.outputs.environment }}.ini \
+            -i /tmp/inventory.ini \
             -e "variant=${{ steps.env.outputs.variant }}" \
             -e "deploy_env=${{ steps.env.outputs.environment }}" \
             -e "git_ref=${{ github.sha }}" \
