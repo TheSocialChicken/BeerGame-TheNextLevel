@@ -114,7 +114,7 @@ jobs:
 
       - name: Install frontend deps
         if: steps.frontend-check.outputs.exists == 'true'
-        run: npm ci
+        run: npm install
         working-directory: frontend
 
       - name: Install Playwright browsers
