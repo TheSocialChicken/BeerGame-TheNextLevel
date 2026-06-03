@@ -63,6 +63,7 @@ jobs:
     name: Deploy to Staging
     runs-on: ubuntu-latest
     needs: [build-backend, build-frontend]
+    continue-on-error: true  # server may not be reachable yet; images are pushed regardless
     steps:
       - uses: actions/checkout@v4
 
