@@ -79,6 +79,19 @@
 		(s) => s.from_company_id === myCompanyId || s.to_company_id === myCompanyId,
 	);
 
+	$: liveLeaderboard = session
+		? Object.values(session.companies)
+			.map((c) => ({ ...c, profit: c.total_revenue - c.total_costs }))
+			.sort((a, b) => b.profit - a.profit)
+		: [];
+
+	$: myRecentOrders = session
+		? Object.values(session.shipments)
+			.filter((s) => s.to_company_id === myCompanyId)
+			.sort((a, b) => b.departs_at - a.departs_at)
+			.slice(0, 5)
+		: [];
+
 	$: timeRemaining = session && session.ends_at > 0
 		? Math.max(0, Math.floor(session.ends_at - Date.now() / 1000))
 		: 0;
@@ -343,6 +356,26 @@
 				{/each}
 			{/if}
 
+			<!-- Live leaderboard (active game only) -->
+			{#if session.status === 'active' && liveLeaderboard.length > 0}
+				<div class="section-title">Standings</div>
+				<div class="live-leaderboard">
+					{#each liveLeaderboard as c, i}
+						<div
+							class="lb-row"
+							class:lb-mine={c.company_id === myCompanyId}
+							class:lb-bankrupt={c.is_bankrupt}
+						>
+							<span class="lb-rank">#{i + 1}</span>
+							<span class="lb-name">{c.player_name}</span>
+							<span class:profit={c.profit >= 0} class:loss={c.profit < 0}>
+								${c.profit.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+							</span>
+						</div>
+					{/each}
+				</div>
+			{/if}
+
 			<!-- Active shipments list -->
 			{#if myActiveShipments.length > 0}
 				<div class="section-title">Active shipments</div>
@@ -353,6 +386,22 @@
 							<span>{cityName(s.from_city)} &rarr; {cityName(s.to_city)}</span>
 							<span class="shipment-qty">{s.quantity} units</span>
 							<span class="shipment-eta">ETA {formatTime(shipmentEta(s))}</span>
+						</div>
+					{/each}
+				</div>
+			{/if}
+
+			<!-- Order history (my received shipments) -->
+			{#if myRecentOrders.length > 0}
+				<div class="section-title">Order history</div>
+				<div class="order-history">
+					{#each myRecentOrders as s}
+						<div class="oh-row" class:oh-delivered={s.status === 'delivered'}>
+							<span class="shipment-mode mode-{s.transport_mode}">{s.transport_mode}</span>
+							<span class="oh-route">{cityName(s.from_city)} &rarr; {cityName(s.to_city)}</span>
+							<span class="oh-qty">{s.quantity}u</span>
+							<span class="oh-status status-{s.status}">{s.status}</span>
+							<span class="oh-cost">-${s.shipping_cost.toFixed(0)}</span>
 						</div>
 					{/each}
 				</div>
@@ -724,6 +773,94 @@
 	.btn-ship:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
+	}
+
+	/* ── Live leaderboard (in-game) ────────────────────────────────────────── */
+	.live-leaderboard {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+	}
+
+	.lb-row {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.3rem 0.5rem;
+		border-radius: 4px;
+		background: #252545;
+		font-size: 0.8rem;
+	}
+
+	.lb-row.lb-mine {
+		border: 1px solid #7ec8e3;
+	}
+
+	.lb-row.lb-bankrupt {
+		opacity: 0.35;
+	}
+
+	.lb-rank {
+		color: #888;
+		min-width: 22px;
+		font-size: 0.75rem;
+	}
+
+	.lb-name {
+		flex: 1;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* ── Order history ──────────────────────────────────────────────────────── */
+	.order-history {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.oh-row {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.3rem 0.5rem;
+		background: #252545;
+		border-radius: 4px;
+		font-size: 0.78rem;
+		flex-wrap: wrap;
+	}
+
+	.oh-row.oh-delivered {
+		opacity: 0.6;
+	}
+
+	.oh-route {
+		flex: 1;
+		font-size: 0.75rem;
+	}
+
+	.oh-qty {
+		color: #aaa;
+		font-size: 0.75rem;
+	}
+
+	.oh-status {
+		font-size: 0.68rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		border-radius: 3px;
+		padding: 0.1rem 0.3rem;
+	}
+
+	.status-in_transit { background: #c8a227; color: #fff; }
+	.status-delivered  { background: #27ae60; color: #fff; }
+	.status-failed     { background: #c0392b; color: #fff; }
+
+	.oh-cost {
+		color: #e74c3c;
+		font-size: 0.75rem;
+		margin-left: auto;
 	}
 
 	/* ── Leaderboard ────────────────────────────────────────────────────────── */
