@@ -251,6 +251,25 @@
 	function fmt(n: number): string {
 		return `$${n.toFixed(2)}`;
 	}
+
+	// SVG sparkline: total_cost per round per role from history
+	function sparkline(role: string, w = 220, h = 60): string {
+		if (!state || state.history.length < 2) return '';
+		const vals = state.history.map(snap => snap.players[role]?.total_cost ?? 0);
+		const max = Math.max(...vals, 1);
+		const pts = vals.map((v, i) => {
+			const x = (i / (vals.length - 1)) * w;
+			const y = h - (v / max) * h;
+			return `${x.toFixed(1)},${y.toFixed(1)}`;
+		});
+		return pts.join(' ');
+	}
+
+	// Bar chart: final total_cost per role
+	function maxCost(): number {
+		if (!state) return 1;
+		return Math.max(...ROLE_ORDER.map(r => state!.players[r]?.total_cost ?? 0), 1);
+	}
 </script>
 
 <div class="layout">
@@ -280,6 +299,7 @@
 						<th>Role</th>
 						<th>Inv</th>
 						<th>BL</th>
+						<th>Ord</th>
 						<th>▶0</th>
 						<th>▶1</th>
 						<th>Cost</th>
@@ -290,9 +310,10 @@
 						{@const p = state.players[role]}
 						{#if p}
 						<tr class:human-row={p.is_human}>
-							<td class="role-cell" style="color:{ROLE_COLORS[role]}">{role}</td>
+							<td class="role-cell" style="color:{ROLE_COLORS[role]}">{role}{p.is_human ? ' 👤' : ' 🤖'}</td>
 							<td>{p.inventory}</td>
 							<td class:backlog-cell={p.backlog > 0}>{p.backlog}</td>
+							<td class="order-cell">{p.order_placed}</td>
 							<td>{p.shipping_pipeline[0]}</td>
 							<td>{p.shipping_pipeline[1]}</td>
 							<td class="cost-cell">{fmt(p.total_cost)}</td>
@@ -362,16 +383,41 @@
 				{/if}
 			{:else if state.status === 'complete'}
 				<div class="game-over">
-					<div class="section-title">Game Complete!</div>
-					{#each ROLE_ORDER as role}
-						{@const p = state.players[role]}
-						{#if p}
-						<div class="stat-row">
-							<span>{role}</span>
-							<strong class:warn={p.total_cost > 100}>{fmt(p.total_cost)}</strong>
-						</div>
-						{/if}
-					{/each}
+					<div class="section-title">🏁 Game Complete — {state.round} rounds</div>
+
+					<!-- Bar chart: final costs -->
+					<div class="chart-title">Total Cost per Role</div>
+					<div class="bar-chart">
+						{#each ROLE_ORDER as role}
+							{@const p = state.players[role]}
+							{#if p}
+							<div class="bar-row">
+								<span class="bar-label" style="color:{ROLE_COLORS[role]}">{role}{p.is_human ? ' 👤' : ' 🤖'}</span>
+								<div class="bar-track">
+									<div class="bar-fill" style="width:{(p.total_cost/maxCost()*100).toFixed(1)}%;background:{ROLE_COLORS[role]}"></div>
+								</div>
+								<span class="bar-value">{fmt(p.total_cost)}</span>
+							</div>
+							{/if}
+						{/each}
+					</div>
+
+					<!-- Sparklines: cost over time per role -->
+					<div class="chart-title">Cost Over Time</div>
+					<div class="sparklines">
+						{#each ROLE_ORDER as role}
+							{@const pts = sparkline(role)}
+							{#if pts}
+							<div class="spark-row">
+								<span class="spark-label" style="color:{ROLE_COLORS[role]}">{role}</span>
+								<svg width="160" height="40" viewBox="0 0 220 60">
+									<polyline points="{pts}" fill="none" stroke="{ROLE_COLORS[role]}" stroke-width="2"/>
+								</svg>
+							</div>
+							{/if}
+						{/each}
+					</div>
+
 					<div class="stat-row total-row">
 						<span>Team total</span>
 						<strong>{fmt(ROLE_ORDER.reduce((s, r) => s + (state!.players[r]?.total_cost ?? 0), 0))}</strong>
@@ -541,6 +587,27 @@
 		font-weight: 700;
 		font-size: 0.95rem;
 	}
+
+	.chart-title {
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: #666;
+		margin: 0.6rem 0 0.3rem;
+	}
+
+	.bar-chart { display: flex; flex-direction: column; gap: 0.3rem; }
+	.bar-row { display: flex; align-items: center; gap: 0.4rem; }
+	.bar-label { width: 80px; font-size: 0.72rem; flex-shrink: 0; }
+	.bar-track { flex: 1; background: #222; border-radius: 3px; height: 10px; overflow: hidden; }
+	.bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
+	.bar-value { font-size: 0.72rem; color: #aaa; width: 55px; text-align: right; flex-shrink: 0; }
+
+	.sparklines { display: flex; flex-direction: column; gap: 0.25rem; }
+	.spark-row { display: flex; align-items: center; gap: 0.5rem; }
+	.spark-label { width: 75px; font-size: 0.7rem; flex-shrink: 0; }
+
+	.order-cell { color: #c8a227; }
 
 	.error { color: #e74c3c; font-size: 0.85rem; margin: 0; }
 	.muted { color: #666; font-size: 0.85rem; }
