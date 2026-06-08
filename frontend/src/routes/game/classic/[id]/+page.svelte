@@ -41,6 +41,7 @@
 	let submitError = '';
 	let submitting = false;
 	let cleanup: (() => void) | null = null;
+	// Track the round number we last submitted for — re-enables form when round advances
 	let lastSubmittedRound = -1;
 
 	// MapLibre
@@ -57,14 +58,11 @@
 		? ROLE_ORDER.filter((r) => state!.players[r]?.is_human)
 		: [];
 
-	$: allSubmitted = state && humanRoles.length > 0
-		? humanRoles.every((r) => r in (state!.orders_this_round ?? {}))
-		: false;
-
+	// Classic game: round advances synchronously on submit.
+	// Show form whenever the current round hasn't been submitted yet.
 	$: canSubmit = state?.status === 'active'
 		&& humanRoles.length > 0
-		&& !allSubmitted
-		&& lastSubmittedRound < (state?.round ?? 0);
+		&& (state?.round ?? 0) >= lastSubmittedRound + 1;
 
 	// ── Lifecycle ──────────────────────────────────────────────────────────────
 	onMount(async () => {
@@ -349,10 +347,8 @@
 
 			<!-- Order form -->
 			{#if state.status === 'active'}
-				<div class="section-title">Place Orders</div>
-				{#if allSubmitted}
-					<p class="waiting">⏳ Orders submitted — waiting for next round...</p>
-				{:else}
+				<div class="section-title">Place Orders — Round {(state.round) + 1}</div>
+				{#if canSubmit}
 					{#each humanRoles as role}
 						<div class="order-row">
 							<label for="order-{role}">{role.charAt(0).toUpperCase() + role.slice(1)}</label>
