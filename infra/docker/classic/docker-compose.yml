@@ -1,0 +1,23 @@
+services:
+  backend:
+    build:
+      context: ../../..
+      dockerfile: infra/docker/classic/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONPATH=/app
+    volumes:
+      - ../../../core:/app/core
+      - ../../../variants/classic:/app/variants/classic
+
+  frontend:
+    build:
+      context: ../../..
+      dockerfile: infra/docker/classic/Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend

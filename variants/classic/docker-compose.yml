@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  classic-api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/classic/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
