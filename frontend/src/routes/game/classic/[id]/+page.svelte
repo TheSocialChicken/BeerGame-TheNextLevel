@@ -41,8 +41,6 @@
 	let submitError = '';
 	let submitting = false;
 	let cleanup: (() => void) | null = null;
-	// Track the round number we last submitted for — re-enables form when round advances
-	let lastSubmittedRound = -1;
 
 	// MapLibre
 	let mapContainer: HTMLElement;
@@ -58,11 +56,7 @@
 		? ROLE_ORDER.filter((r) => state!.players[r]?.is_human)
 		: [];
 
-	// Classic game: round advances synchronously on submit.
-	// Show form whenever the current round hasn't been submitted yet.
-	$: canSubmit = state?.status === 'active'
-		&& humanRoles.length > 0
-		&& (state?.round ?? 0) >= lastSubmittedRound + 1;
+	$: canSubmit = state?.status === 'active' && humanRoles.length > 0;
 
 	// ── Lifecycle ──────────────────────────────────────────────────────────────
 	onMount(async () => {
@@ -246,7 +240,6 @@
 
 		try {
 			state = await submitOrders(gameId, orders);
-			lastSubmittedRound = state.round;
 			if (mapLoaded) updateMarkers();
 		} catch (e) {
 			submitError = e instanceof Error ? e.message : 'Failed to submit orders.';
